@@ -1,0 +1,28 @@
+{
+    "date": {
+        "user_id": "string",
+        "start_date": "string",
+        "end_date": "string"
+    },
+    "start_end": {
+        "arrival": "string",
+        "arrivaltime": "string",
+        "departure": "string",
+        "departuretime": "string"
+    },
+    "user": {
+        "start_time": "string",
+        "end_time": "string",
+        "travel_style": "string",
+        "meal_time_preferences": {
+            "breakfast": ["string", "string"],
+            "lunch": ["string", "string"],
+            "dinner": ["string", "string"]
+        }
+    },
+    "places_by_day": {
+        "YYYY-MM-DD": [
+            { "name": "string" }
+        ]
+    }
+}
