@@ -32,8 +32,21 @@ def fetch_route(
     """
     url = "https://naveropenapi.apigw.ntruss.com/map-direction/v1/driving"
     params = {"start": start, "goal": goal, "lang": "ko"}
+
+    #백앤드 api 테스트
+    logger.debug("🚀 호출 URL: %s", url)
+    logger.debug("📌 요청 파라미터: %s", params)
+    logger.debug("🔑 요청 헤더: %s", headers)
+
     try:
         resp = requests.get(url, headers=headers, params=params, timeout=timeout)
+
+        logger.debug("📥 응답 코드: %s", resp.status_code)
+        if resp.status_code == 401:
+            logger.error("❌ 401 Unauthorized: 인증 실패! 키를 확인하세요.")
+        elif resp.status_code != 200:
+            logger.warning("⚠️ API 비정상 응답: %s - %s", resp.status_code, resp.text)
+
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException as e:
