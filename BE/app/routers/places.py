@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from typing import List, Dict
 from datetime import datetime
+from sqlalchemy import or_ 
 from sqlalchemy import func
 from app.database import get_db
 from app.models.jeju_cafe import JejuCafe
@@ -44,18 +45,28 @@ def fetch_image_urls(db: Session, model, name: str) -> list[str]:
         return []
 
 #  장소 검색
+
 @router.get("/search", response_model=PlaceSearchOutput)
 def search_places(name: str = Query(..., min_length=1), db: Session = Depends(get_db)):
     search_term = f"%{name.strip()}%"
     results = []
+
     for model_type, model in PLACE_MODELS.items():
         try:
-            matches = db.query(model).filter(func.lower(model.name).like(func.lower(search_term))).all()
+            matches = db.query(model).filter(
+                or_(
+                    func.lower(model.name).like(func.lower(search_term)),
+                    func.lower(getattr(model, "category", "")).like(func.lower(search_term))
+                )
+            ).all()
+
             for match in matches:
-                results.append(PlaceSearchResult(name=match.name, type=model_type))
+                results.append(PlaceSearchResult(name=match.name))
         except Exception as e:
             print(f"[{model_type}] 검색 중 오류 발생: {str(e)}")
-    results.append(PlaceSearchResult(name=match.name))
+
+    return PlaceSearchOutput(search=results)
+
 
 #  장소 상세 정보 조회
 @router.get("/data", response_model=PlaceDataResponse)

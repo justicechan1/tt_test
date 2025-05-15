@@ -1,13 +1,3 @@
-<<<<<<< HEAD
-#models\main_cafe.py
-from sqlalchemy import Column, Integer, String, Float, Text, DECIMAL
-from app.database import Base
-
-class jeju_Cafe(Base):
-    __tablename__ = "jeju_cafe"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-=======
 from sqlalchemy import Column, Integer, String, Float, Text, DECIMAL
 from app.database import Base
 
@@ -15,7 +5,6 @@ class JejuCafe(Base):
     __tablename__ = "jeju_cafe"
 
     cafe_id = Column(Integer, primary_key=True, autoincrement=True)
->>>>>>> cace62f (tt_test_v3)
     name = Column(String(255))
     category = Column(String(255))
     page_url = Column(Text)
@@ -31,46 +20,21 @@ class JejuCafe(Base):
     break_time = Column(String(255))
     service_time = Column(String(255))
     closed_days = Column(String(255))
-<<<<<<< HEAD
-
-    class Config:
-        orm_mode = True
-
-class JejuCafeImage(Base):
-    __tablename__ = "jeju_cafe_image"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(255))
-    url_1 = Column(String(500))
-    url_2 = Column(String(500))
-    url_3 = Column(String(500))
-    url_4 = Column(String(500))
-    url_5 = Column(String(500))
-    url_6 = Column(String(500))
-=======
     image_url = Column(Text)
 
     @property
     def id(self):
         return self.cafe_id
->>>>>>> cace62f (tt_test_v3)
 
     class Config:
         orm_mode = True
 
 class JejuCafeHashtag(Base):
-<<<<<<< HEAD
-    __tablename__ = "jeju_cafe_hashtags"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String)
-    hashtag_name = Column(String)
-=======
     __tablename__ = "jeju_cafe_hashtags"  
 
     cafe_id = Column(Integer, primary_key=True)
     name = Column(String(255))
     hashtag_name = Column(Text)  
->>>>>>> cace62f (tt_test_v3)
 
     class Config:
         orm_mode = True

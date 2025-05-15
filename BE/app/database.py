@@ -4,11 +4,11 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 
-SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:tt123@127.0.0.1:3306/tt_test" #캡실컴
+#SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:tt123@127.0.0.1:3306/tt_test" #캡실컴
 
-# SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:1234@127.0.0.1:3306/tt_test" #의찬
+SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:1234@127.0.0.1:3306/tt_test" #의찬
 # SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:tt123@192.168.0.129:3306/tt_test"  #DB URL입력
-# SQLALCHEMY_DATABASE_URL = "mysql+pymysql://justice:tt123@192.168.0.129:3306/tt" 
+# SQLALCHEMY_DATABASE_URL = "mysql+pymysql://justice:tt123@192.168.0.129:3306/tt"  #캡실 네트워크 연결
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
