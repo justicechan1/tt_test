@@ -21,7 +21,7 @@
           </button>
         </li>
         <li id="side_btn">
-          <button id="test_btn">
+          <button id="test_btn" @click="place_Popup($event)">
             <span> ❓ </span>
           </button>
         </li>
@@ -32,15 +32,22 @@
 
     <!-- 팝업 슬라이딩 애니메이션 -->
     <transition name="slide-popup">
-      <CalPop v-if="isCalendarPopupVisible" class="popup-panel" :scheduleData="scheduleResponse" @close="calendar_Popup" />
+      <CalPop v-if="isCalendarPopupVisible" class="popup-panel" @close="calendar_Popup" />
     </transition>
     <transition name="slide-popup">
-      <SearchPop v-if="isSearchPopupVisible" class="popup-panel" @close="search_Popup" />
+      <SearchPop v-if="isSearchPopupVisible" class="popup-panel" @close="search_Popup" @select-place="handleSelectPlace"/>
     </transition>
     <transition name="slide-popup">
       <SavePop v-if="isSavePopupVisible" class="popup-panel" @close="save_Popup" />
     </transition>
 
+    <PlacePop 
+      v-if="isPlacePopupVisible" 
+      :key="selectedPlace?.name"
+      :place="selectedPlace"
+      :style="popupStyle"
+      @close="handleClosePlace"
+    />
     <div id="category_btn">
       <button class="category-button" @click="handleRoundButtonClick">관광명소</button>
       <button class="category-button" @click="handleRoundButtonClick">카페</button>
@@ -53,20 +60,23 @@
 import CalPop from '@/components/calender.vue'  // 일정 표
 import SearchPop from '@/components/search.vue'  // 장소 검색
 import SavePop from '@/components/save_file.vue'  // 파일 저장장
+import PlacePop from '@/components/place.vue'
 
 export default {
   name: 'MainPage',
   components: {
     SearchPop,
     CalPop,
-    SavePop
+    SavePop,
+    PlacePop
   },
   data() {
     return {
+      selectedPlace: null,
       isCalendarPopupVisible: false, // 달력 팝업 상태 관리
       isSearchPopupVisible: false, // 검색 팝업 상태 관리
       isSavePopupVisible: false,
-      popupStyle: {}, // 팝업 스타일
+      isPlacePopupVisible: false,
     };
   },
   methods: {
@@ -74,6 +84,7 @@ export default {
       this.isCalendarPopupVisible = false;
       this.isSearchPopupVisible = false;
       this.isSavePopupVisible = false;
+      this.isPlacePopupVisible = false;
     },
     calendar_Popup() {
       if (this.isCalendarPopupVisible) {
@@ -117,6 +128,20 @@ export default {
         };
       }
     },
+    handleSelectPlace(place) {
+      this.selectedPlace = place;
+      this.isPlacePopupVisible = true;
+      this.popupStyle = {
+          position: 'absolute',
+          top: `30px`,
+          left: `420px`, // 검색 팝업 오른쪽에 위치
+          zIndex: 1000
+        };
+    },
+    handleClosePlace() {
+      this.selectedPlace = null; // 장소 팝업만 닫기
+      this.isPlacePopupVisible = false;
+    }
   },
   mounted() {
     // 네이버 지도 API 스크립트 로드

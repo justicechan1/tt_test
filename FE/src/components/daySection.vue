@@ -58,24 +58,22 @@ export default {
           end_date: formatDate(this.range.end)
         },
         start_end: {
-          arrival: "제주공항",
-          arrivaltime: "09:00",
-          departure: "제주공항",
-          departuretime: "18:00"
+          arrival: "",
+          arrivaltime: "",
+          departure: "",
+          departuretime: ""
         },
         user: {
-          start_time: "09:00",
-          end_time: "18:00",
-          travel_style: "편안한",
+          start_time: "",
+          end_time: "",
+          travel_style: "",
           meal_time_preferences: {
-            breakfast: ["08:00"],
-            lunch: ["12:30"],
-            dinner: ["18:30"]
+            breakfast: [""],
+            lunch: [""],
+            dinner: [""]
           }
         },
-        places_by_day: {
-          [formatDate(this.range.start)]: [{ name: "우무" }]
-        }
+        places_by_day: {}
       };
 
       console.log("보내는 payload ↓↓↓");
@@ -83,10 +81,8 @@ export default {
 
       try {
         await initSchedule(payload);
-        alert('일정 저장 완료');
         this.$emit('next');
       } catch (e) {
-        alert('일정 저장 실패');
         console.error(e);
       }
     }

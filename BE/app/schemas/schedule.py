@@ -1,6 +1,6 @@
 #schemas\schedule.py
 from pydantic import BaseModel
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional
 
 # ------------------- /init 요청 -------------------
 

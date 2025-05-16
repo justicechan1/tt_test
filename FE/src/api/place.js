@@ -11,3 +11,15 @@ export const searchPlaces = async (query) => {
     return [];
   }
 };
+
+export const getPlaceDetail = async (name) => {
+  try {
+    const res = await api.get('/api/places/data', {
+      params: { name }
+    });
+    return res.data.places;
+  } catch (error) {
+    console.error('getPlaceDetail 실패:', error.response?.data || error);
+    throw error;
+  }
+};

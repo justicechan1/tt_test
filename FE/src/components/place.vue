@@ -1,58 +1,153 @@
 <template>
   <div id="pop">
-    <header> <!-- 팝업의 헤더 -->
-      <h2 id="place_name"> {{ name }}</h2>
-      <h4 id="place_address"> {{ address }} </h4>
-      <h4 id="running time"> {{ day }} {{ time }}</h4>
+    <header>
+      <h2 id="place_name">
+        <a
+          :href="'https://www.instagram.com/explore/search/keyword/?q=' + encodeURIComponent(place.name)"
+          target="_blank"
+          id="instagram_link"
+        >
+          <img src="@/assets/instagram.png" alt="Instagram" id="instagram_img" />
+        </a>
+        {{ placeData?.name || place.name }}
+      </h2>
+
+      <p id="place_category"> {{ placeData?.category || '카테고리 없음' }} </p>
+      <p id="place_address"> {{ placeData?.address || '주소 정보 없음' }} </p>
+      <p id="running_time"> {{ placeData?.open_time || '-' }} ~ {{ placeData?.close_time || '-' }} </p>
     </header>
-    <article id ="review">
-      <!-- <iframe src="https://www.instagram.com/explore/search/keyword/?q=해지개" width="98%" height="100%"> </iframe> -->
+
+    <article id="review">
+      <div class="image-slider" v-if="placeData?.image_urls?.length">
+        <div class="image-container">
+          <img
+            v-for="(image, index) in placeData.image_urls"
+            :key="index"
+            :src="image"
+            :alt="'Image' + (index + 1)"
+            class="slider-image"
+          />
+        </div>
+      </div>
     </article>
+
     <footer>
-      <button id = "close_btn"> 닫기❌ </button>
+      <button id="add_place"> 추가➕ </button>
+      <button id="close_btn" @click="$emit('close')"> 닫기❌ </button>
     </footer>
   </div>
 </template>
 
 <script>
-  export default {
-    name: 'Place_',
-    props: {
-      name: String,
-      address: String,
-      day: String,
-      time: String
+import { getPlaceDetail } from '@/api/place';
+
+export default {
+  name: 'PlacePop',
+  props: {
+    place: {
+      type: Object,
+      required: true
+    }
+  },
+  data() {
+    return {
+      placeData: null
+    };
+  },
+  async mounted() {
+    try {
+      const res = await getPlaceDetail(this.place.name);
+      this.placeData = res;
+    } catch (e) {
+      console.error('상세 정보 불러오기 실패:', e);
     }
   }
+};
 </script>
 
 <style scoped>
 #pop {
-  width: 330px;
-  height: 85%;
+  width: 350px;
+  height: 70%;
+  padding: 20px;
   background-color: white;
   border: 3px solid skyblue;
   border-radius: 10px;
+  position: absolute;
 }
   
 header {
-  width: 90%;
-  height: 20%;
-} 
-  
-article {
-  width: 100%;
-  height: 70%;
-} 
-  
-footer {
+  flex: 0 0 20%; /* 상단 20% */
+  margin-bottom: 10px;
   display: flex;
-  justify-content: flex-start; /* 좌측 정렬 */
-  padding: 10px; /* 여백 추가 */
+  flex-direction: column;
+  justify-content: center;
+} 
+
+header p{
+  margin: 0;       /* 모든 자식 요소의 기본 margin 제거 */
+  padding: 0;      /* 혹시 패딩 있으면 제거 */
+  line-height: 1;  /* 줄 간격 조절 (필요시) */
 }
-  
+
+header h2 {
+  margin: 0;
+}
+
+article {
+  flex: 1 0 auto;
+  max-height: 70%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+} 
+
+#instagram_link {
+  display: inline-block;
+  cursor: pointer;
+}
+
+#instagram_img {
+  width: 40px;
+  height: 40px;
+  margin: 0;
+}
+
+.image-slider {
+  width: 100%;
+  height: 100%;
+  overflow-x: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  scroll-behavior: smooth;
+}
+
+.image-container {
+  display: flex;
+  gap: 10px;
+}
+
+.slider-image {
+  width: 250px; /* 이미지 고정 너비 */
+  height: 450px; /* 이미지 고정 높이 */
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0; /* 이미지가 작아지지 않도록 */
+}
+
+footer {
+  flex: 0 0 10%;
+  display: flex;
+  justify-content: space-between; /* 양쪽 끝 정렬 */
+  align-items: center;
+  padding: 0 10px; /* 좌우 여백 조절 */
+}
+
+#add_place,
 #close_btn {
-  background-color: none; /* 버튼 배경색 */
+  background-color: white; /* 버튼 배경색 */
   border: none; /* 테두리 제거 */
   padding: 8px 12px; /* 패딩 추가 */
   cursor: pointer; /* 커서 변경 */

@@ -38,15 +38,3 @@ class PlaceDataResult(BaseModel):
 
 class PlaceDataResponse(BaseModel):
     places: PlaceDataResult
-
-class PlaceDetailOutput(BaseModel):
-    name: str
-    address: str
-    phone: Optional[str] = None
-    convenience: Optional[str] = None
-    category: Optional[str] = None
-    website: Optional[str] = None
-    business_hours: Optional[str] = None
-    open_time: Optional[str] = None
-    close_time: Optional[str] = None
-    image_urls: List[str] = []

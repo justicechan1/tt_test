@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
+from typing import Dict, List
 from datetime import datetime
 from app.models.jeju_cafe import JejuCafe
 from app.models.jeju_restaurant import JejuRestaurant
@@ -24,8 +25,7 @@ PLACE_MODELS = {
     "hotel": (JejuHotel)
 }
 
-# ---------------------- /init ----------------------
-
+# ---------- /init ----------
 @router.post("/init", response_model=ScheduleInitOutput)
 def init_schedule(input_data: ScheduleInitInput, db: Session = Depends(get_db)):
     user_id = input_data.date.user_id
@@ -33,6 +33,7 @@ def init_schedule(input_data: ScheduleInitInput, db: Session = Depends(get_db)):
     user_schedules[user_id] = {
         "date": input_data.date,
         "start_end": input_data.start_end,
+        "user": input_data.user,
         "places_by_day": {}
     }
     enriched_places_by_day = {}
@@ -73,8 +74,7 @@ def init_schedule(input_data: ScheduleInitInput, db: Session = Depends(get_db)):
         places_by_day=enriched_places_by_day
     )
 
-# ---------------------- /init_show ----------------------
-
+# ---------- /init_show ----------
 @router.get("/init_show", response_model=ScheduleShowOutput)
 def show_schedule(user_id: str = Query(..., min_length=1), db: Session = Depends(get_db)):
     if user_id not in user_schedules:
@@ -85,16 +85,15 @@ def show_schedule(user_id: str = Query(..., min_length=1), db: Session = Depends
     start_end_info = schedule_data["start_end"]
     stored_places_by_day = schedule_data["places_by_day"]
 
-    # ✅ 사용자에게 보여줄 용도: Day 1, Day 2, ...
     result_places_by_day = {}
 
     start_date = datetime.strptime(date_info.start_date, "%Y-%m-%d")
 
-    # 날짜 정렬 보장
+    # 날짜 정렬
     for date_str in sorted(stored_places_by_day.keys()):
         current_date = datetime.strptime(date_str, "%Y-%m-%d")
         day_index = (current_date - start_date).days + 1
-        day_key = f"Day {day_index}"  # 사용자에게 보여줄 키
+        day_key = f"Day {day_index}"  
 
         day_places = []
 
@@ -130,5 +129,5 @@ def show_schedule(user_id: str = Query(..., min_length=1), db: Session = Depends
     return ScheduleShowOutput(
         date=date_info,
         start_end=start_end_info,
-        places_by_day=result_places_by_day  # 응답 전용: Day 1, Day 2로 구성된 dict
+        places_by_day=result_places_by_day  
     )
