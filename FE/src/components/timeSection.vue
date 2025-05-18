@@ -71,7 +71,7 @@ export default {
 
       const payload = {
         date: {
-          user_id: '2',
+          user_id: '1',
           start_date: this.startDay,
         end_date: this.endDay
       },

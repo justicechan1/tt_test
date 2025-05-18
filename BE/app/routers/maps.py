@@ -119,10 +119,26 @@ def get_move_candidates(input_data: MoveInput, db: Session = Depends(get_db)):
     return MoveResponse(move=results)
 
 # ---------- 경로 결과 포맷 변환 ----------
+def is_same_coord(p1, p2, tol=1e-6):
+    return abs(p1[0] - p2[0]) < tol and abs(p1[1] - p2[1]) < tol
+
 def convert_to_move_response(data: dict) -> RouteResponse:
     visits = [VisitInfo(**v) for v in data.get("visits", [])]
-    path = [[[p[0], p[1]] for p in segment] for segment in data.get("path", [])]
-    return RouteResponse(visits=visits, path=path)
+    path = data.get("path", [])
+
+    def is_same_coord(p1, p2, tol=1e-6):
+        return abs(p1[0] - p2[0]) < tol and abs(p1[1] - p2[1]) < tol
+
+    # ✅ 시작점과 마지막 segment의 도착지가 같으면 제거
+    if len(path) >= 2:
+        first = path[0][0]
+        last = path[-1][1]
+        if is_same_coord(first, last):
+            path = path[:-1]  # 마지막 segment 제거
+
+    formatted_path = [[[p[0], p[1]] for p in segment] for segment in path]
+    return RouteResponse(visits=visits, path=formatted_path)
+
 
 # ---------- 사용자 일정 정보 가져오기 ----------
 def get_day_info(user_id: str, target_date: str) -> dict:
@@ -152,8 +168,13 @@ def build_schedule_input(user_id: str, target_date: str, db: Session) -> dict:
     places_by_day = schedule_data["places_by_day"]
     user_info = schedule_data["user"]
 
-    if target_date not in places_by_day:
-        raise HTTPException(status_code=404, detail=f"{target_date}에 해당하는 장소 데이터가 없습니다.")
+    # ✅ 해당 날짜의 장소가 없거나 비어 있으면 빈 리스트 반환
+    if target_date not in places_by_day or not places_by_day[target_date]:
+        return {
+            "places": [],
+            "user": user_info.dict(),
+            "day_info": get_day_info(user_id, target_date)
+        }
 
     place_objs: List[dict] = []
     for place in places_by_day[target_date]:
@@ -189,17 +210,20 @@ def build_schedule_input(user_id: str, target_date: str, db: Session) -> dict:
 # ---------- /route ----------
 @router.post("/route", response_model=RouteResponse)
 def get_optimal_route(input_data: RouteInput, db: Session = Depends(get_db)):
-    # 1. 사용자 입력 기반 일정 구성
     input_dict = build_schedule_input(
         user_id=input_data.user_id,
         target_date=input_data.date,
         db=db
     )
 
-    # 경로 최적화 알고리즘 실행
+    # ✅ 장소가 하나도 없는 경우 빈 결과 반환
+    if not input_dict["places"]:
+        return RouteResponse(visits=[], path=[])
+
+    # 🧠 경로 최적화 실행
     result = schedule_trip(input_dict)
 
-    #/init_show 데이터 갱신
+    # 📌 순서 저장 및 일정 갱신
     ordered_place_names = [visit["place"] for visit in result.get("visits", [])]
     original_places = user_schedules[input_data.user_id]["places_by_day"][input_data.date]
     name_to_place = {

@@ -78,6 +78,8 @@ def get_place_detail(name: str = Query(..., min_length=1), db: Session = Depends
                 places=PlaceDataResult(
                     name=place.name,
                     address=place.address,
+                    x_cord=getattr(place, "x_cord", None), 
+                    y_cord=getattr(place, "y_cord", None),
                     phone=getattr(place, "phone", None),
                     convenience=getattr(place, "convenience", None),
                     category=getattr(place, "category", None),

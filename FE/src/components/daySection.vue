@@ -5,7 +5,7 @@
       <h3>여행 날짜를 선택해주세요</h3>
     </div>
     <div class="article_section">
-      <VDatePicker v-model.range="range" mode="date" />
+      <VDatePicker v-if="range.start && range.end" v-model.range="range" mode="date"/>
       <p>일수: {{ tripDays }}</p>
     </div>
     <footer>
@@ -23,7 +23,7 @@ export default {
   data() {
     return {
       range: {
-        start: new Date(),
+        start: new Date(),  
         end: new Date()
       }
     };
@@ -53,7 +53,7 @@ export default {
       // API 호출용 payload 구성
       const payload = {
         date: {
-          user_id: '2',
+          user_id: '1',
           start_date: formatDate(this.range.start),
           end_date: formatDate(this.range.end)
         },

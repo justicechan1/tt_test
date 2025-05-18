@@ -2,81 +2,72 @@
   <div id="map_page">
     <nav id="side">
       <ul class="nav_list">
-        <li style="background-color: skyblue; border-color: skyblue;">
-          <h1> ✈️ </h1>
-        </li>
-        <li id="side_btn">
-          <button id="search_btn" @click="search_Popup($event)">
-            <p> 🔍 </p>
-          </button>
-        </li>
-        <li id="side_btn">
-          <button id="calender_btn" @click="calendar_Popup($event)">
-            <span> 📆 </span>
-          </button>
-        </li>
-        <li id="side_btn">
-          <button id="save_btn" @click="save_Popup($event)">
-            <span> 💾 </span>
-          </button>
-        </li>
-        <li id="side_btn">
-          <button id="test_btn" @click="place_Popup($event)">
-            <span> ❓ </span>
-          </button>
-        </li>
+        <li style="background-color: skyblue; border-color: skyblue;"><h1> ✈️ </h1></li>
+        <li id="side_btn"><button @click="search_Popup"><p> 🔍 </p></button></li>
+        <li id="side_btn"><button @click="calendar_Popup"><span> 📆 </span></button></li>
+        <li id="side_btn"><button @click="save_Popup"><span> 💾 </span></button></li>
+        <li id="side_btn"><button @click="place_Popup"><span> ❓ </span></button></li>
       </ul>
     </nav>
 
     <div id="map" style="width: 100%; height: 100%;"></div>
 
-    <!-- 팝업 슬라이딩 애니메이션 -->
+    <!-- 팝업들 -->
     <transition name="slide-popup">
-      <CalPop v-if="isCalendarPopupVisible" class="popup-panel" @close="calendar_Popup" />
+      <CalPop v-if="isCalendarPopupVisible" class="popup-panel" @close="calendar_Popup" @select-day="handleSelectDay" @loading="handleRouteLoading"/>
     </transition>
     <transition name="slide-popup">
-      <SearchPop v-if="isSearchPopupVisible" class="popup-panel" @close="search_Popup" @select-place="handleSelectPlace"/>
+      <SearchPop v-if="isSearchPopupVisible" class="popup-panel" @close="search_Popup" @select-place="handleSelectPlace" />
     </transition>
     <transition name="slide-popup">
       <SavePop v-if="isSavePopupVisible" class="popup-panel" @close="save_Popup" />
     </transition>
 
     <PlacePop 
+      ref="placePopup"
       v-if="isPlacePopupVisible" 
       :key="selectedPlace?.name"
       :place="selectedPlace"
       :style="popupStyle"
       @close="handleClosePlace"
+      @place-added="refreshCalendar"
     />
+
     <div id="category_btn">
       <button class="category-button" @click="handleRoundButtonClick">관광명소</button>
       <button class="category-button" @click="handleRoundButtonClick">카페</button>
       <button class="category-button" @click="handleRoundButtonClick">음식점</button>
     </div>
+
+  <div v-if="isLoadingRoute" class="loading-overlay">
+      <div class="spinner"></div>
+      <p>경로 최적화 중...</p>
+    </div>
   </div>
 </template>
 
 <script>
-import CalPop from '@/components/calender.vue'  // 일정 표
-import SearchPop from '@/components/search.vue'  // 장소 검색
-import SavePop from '@/components/save_file.vue'  // 파일 저장장
-import PlacePop from '@/components/place.vue'
+import CalPop from '@/components/calender.vue';
+import SearchPop from '@/components/search.vue';
+import SavePop from '@/components/save_file.vue';
+import PlacePop from '@/components/place.vue';
 
 export default {
   name: 'MainPage',
-  components: {
-    SearchPop,
-    CalPop,
-    SavePop,
-    PlacePop
-  },
+  components: { CalPop, SearchPop, SavePop, PlacePop },
   data() {
     return {
       selectedPlace: null,
-      isCalendarPopupVisible: false, // 달력 팝업 상태 관리
-      isSearchPopupVisible: false, // 검색 팝업 상태 관리
+      selectedMarker: null,
+      isCalendarPopupVisible: false,
+      isSearchPopupVisible: false,
       isSavePopupVisible: false,
       isPlacePopupVisible: false,
+      isLoadingRoute: false, //로딩
+      popupStyle: {},
+      markers: [],
+      polyline: [],
+      map: null
     };
   },
   methods: {
@@ -87,78 +78,153 @@ export default {
       this.isPlacePopupVisible = false;
     },
     calendar_Popup() {
-      if (this.isCalendarPopupVisible) {
-        this.closePopups(); // 이미 열려있으면 닫기
-      } else {
-        this.closePopups(); // 다른 팝업 닫기
-        this.isCalendarPopupVisible = true; // 달력 팝업 열기
-        this.popupStyle = {
-          position: 'absolute',
-          top: `20px`,
-          left: `110px`,
-          zIndex: 1000
-        };
-      }
+      this.togglePopup('isCalendarPopupVisible');
     },
     search_Popup() {
-      if (this.isSearchPopupVisible) {
-        this.closePopups(); // 이미 열려있으면 닫기
-      } else {
-        this.closePopups(); // 다른 팝업 닫기
-        this.isSearchPopupVisible = true; // 검색 팝업 열기
-        this.popupStyle = {
-          position: 'absolute',
-          top: `20px`,
-          left: `110px`,
-          zIndex: 1000
-        };
-      }
+      this.togglePopup('isSearchPopupVisible');
     },
     save_Popup() {
-      if (this.isSavePopupVisible) {
-        this.closePopups(); // 이미 열려있으면 닫기
+      this.togglePopup('isSavePopupVisible');
+    },
+    place_Popup() {
+      this.togglePopup('isPlacePopupVisible');
+    },
+    togglePopup(popupName) {
+      if (this[popupName]) {
+        this.closePopups();
       } else {
-        this.closePopups(); // 다른 팝업 닫기
-        this.isSavePopupVisible = true; // 검색 팝업 열기
+        this.closePopups();
+        this[popupName] = true;
         this.popupStyle = {
           position: 'absolute',
-          top: `20px`,
-          left: `110px`,
+          top: '20px',
+          left: '110px',
           zIndex: 1000
         };
       }
     },
     handleSelectPlace(place) {
+      console.log('🔥 선택된 장소:', place);
       this.selectedPlace = place;
       this.isPlacePopupVisible = true;
       this.popupStyle = {
-          position: 'absolute',
-          top: `30px`,
-          left: `420px`, // 검색 팝업 오른쪽에 위치
-          zIndex: 1000
-        };
+        position: 'absolute',
+        top: '30px',
+        left: '420px',
+        zIndex: 1000
+      };
+      if (this.selectedMarker) {
+        this.selectedMarker.setMap(null);
+      }
+
+      setTimeout(() => {
+        const placeData = this.$refs.placePopup?.placeData;
+
+        if (placeData?.x_cord && placeData?.y_cord && this.map) {
+          const latLng = new window.naver.maps.LatLng(placeData.y_cord, placeData.x_cord);
+          this.selectedMarker = new window.naver.maps.Marker({
+            position: latLng,
+            map: this.map,
+            icon: { //마커 부분 수정 해줘잉
+              content: '<div style="background:tomato;color:white;padding:5px 10px;border-radius:8px;">📍</div>',
+              anchor: new window.naver.maps.Point(12, 35)
+            }
+          });
+        }
+      }, 300);
     },
     handleClosePlace() {
-      this.selectedPlace = null; // 장소 팝업만 닫기
+      this.selectedPlace = null;
       this.isPlacePopupVisible = false;
-    }
+      if (this.selectedMarker) {
+        this.selectedMarker.setMap(null);
+        this.selectedMarker = null;
+      }
+    },
+    refreshCalendar() {
+      if (this.isCalendarPopupVisible && this.$refs.calendarRef) {
+        this.$refs.calendarRef.SelectedDay();
+      }
+    },
+    createNumberMarkerIcon(number) {
+      const svg = `
+        <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="18" fill="skyblue" />
+          <text x="20" y="26" font-size="18" font-family="Arial" fill="white" font-weight="bold" text-anchor="middle">${number}</text>
+        </svg>
+      `;
+      return 'data:image/svg+xml;base64,' + btoa(svg);
+    },
+    handleSelectDay({ coordinates, path }) {
+      this.isLoadingRoute = true;
+      this.markers.forEach(marker => marker.setMap(null));
+      this.markers = [];
+
+      if (this.polyline) {
+        this.polyline.forEach(line => line.setMap(null));
+      }
+      this.polyline = [];
+
+      coordinates.forEach(({ x, y }, index) => {
+        const marker = new window.naver.maps.Marker({
+          position: new window.naver.maps.LatLng(y, x),
+          map: this.map,
+          icon: {
+            url: this.createNumberMarkerIcon(index + 1),
+            size: new window.naver.maps.Size(40, 40),
+            anchor: new window.naver.maps.Point(20, 20)
+          }
+        });
+        this.markers.push(marker);
+      });
+
+      //경로 그리기
+      let filteredPath = path;
+      if (path.length > 1) {
+        const [x1, y1] = path[0][0];
+        const [xLast, yLast] = path[path.length - 1][1];
+        if (x1 === xLast && y1 === yLast) {
+          filteredPath = path.slice(0, -1);  
+        }
+      }
+      filteredPath.forEach(segment => {
+        const latLngs = segment.map(([x, y]) => new window.naver.maps.LatLng(y, x));
+        const line = new window.naver.maps.Polyline({
+          map: this.map,
+          path: latLngs,
+          strokeColor: 'skyblue',
+          strokeOpacity: 0.8,
+          strokeWeight: 2
+        });
+        this.polyline.push(line);
+      });
+    },
+    handleRouteLoading(isLoading) {
+      this.isLoadingRoute = isLoading;
+    },
   },
+  watch: {
+      isPlacePopupVisible(newVal) {
+        if (!newVal && this.selectedMarker) {
+          this.selectedMarker.setMap(null);
+          this.selectedMarker = null;
+        }
+      }
+    },
   mounted() {
-    // 네이버 지도 API 스크립트 로드
     const script = document.createElement("script");
-    script.src = "https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=f0u1dydazz"; // 실제 NCP Client ID로 변경
+    script.src = "https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=f0u1dydazz";
     script.async = true;
     script.defer = true;
     document.head.appendChild(script);
-
     script.onload = () => {
-      // 네이버 지도 생성
-      new window.naver.maps.Map("map", {
-        center: new window.naver.maps.LatLng(33.4, 126.55), 
+      this.map = new window.naver.maps.Map("map", {
+        center: new window.naver.maps.LatLng(33.4, 126.55),
         zoom: 11,
       });
     };
-  }
+    
+  },
 };
 </script>
 
@@ -275,4 +341,33 @@ body {
   transform: translateX(-20px);
 }
 
+/*로딩 부분*/
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.spinner {
+  border: 6px solid #eee;
+  border-top: 6px solid skyblue;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 </style>

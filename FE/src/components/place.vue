@@ -32,14 +32,14 @@
     </article>
 
     <footer>
-      <button id="add_place"> 추가➕ </button>
+      <button id="add_place" @click="addPlace"> 추가➕ </button>
       <button id="close_btn" @click="$emit('close')"> 닫기❌ </button>
     </footer>
   </div>
 </template>
 
 <script>
-import { getPlaceDetail } from '@/api/place';
+import { addPlaceToSchedule, getPlaceDetail } from '@/api/place';
 
 export default {
   name: 'PlacePop',
@@ -51,16 +51,34 @@ export default {
   },
   data() {
     return {
-      placeData: null
+      placeData: null,
+      userId: localStorage.getItem('userId') ?? ''
     };
   },
-  async mounted() {
-    try {
-      const res = await getPlaceDetail(this.place.name);
-      this.placeData = res;
-    } catch (e) {
-      console.error('상세 정보 불러오기 실패:', e);
+  methods: {
+    async addPlace() {
+      const userId = 1; // 테스트 고정
+      const selectedDate = localStorage.getItem("selectedDate") || "2025-05-22";
+      const placeName = this.place.name;
+
+      const inputData = {
+        places_by_day: {
+          [selectedDate]: [{ name: placeName }]  // ✅ PlaceNameOnly 형태
+        }
+      };
+
+      try {
+        await addPlaceToSchedule(userId, inputData);
+        alert("✅ 일정에 추가 완료!");
+        this.$emit("place-added");
+      } catch (error) {
+        alert(`🚫 추가 실패: ${JSON.stringify(error.response?.data?.detail)}`);
+      }
     }
+  },
+  async mounted() {
+    const res = await getPlaceDetail(this.place.name);
+    this.placeData = res;
   }
 };
 </script>

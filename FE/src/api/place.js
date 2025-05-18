@@ -23,3 +23,13 @@ export const getPlaceDetail = async (name) => {
     throw error;
   }
 };
+
+export const addPlaceToSchedule = async (userId, inputData) => {
+  try {
+    const res = await api.post(`/api/places/add?user_id=${userId}`, inputData);
+    return res.data;
+  } catch (error) {
+    console.error("addPlaceToSchedule 실패:", error.response?.data || error);
+    throw error;
+  }
+};
