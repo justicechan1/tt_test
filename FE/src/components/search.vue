@@ -12,6 +12,7 @@
     </header>
 
     <article id="place_list" v-if="!selectedPlace">
+      <p> ✅ 추천 장소</p>
       <ul>
         <li 
           v-for="(place, index) in filteredPlaces" 
@@ -21,6 +22,7 @@
         </li>
       </ul>
     </article>
+
     <footer>
       <button id="close_btn" @click="$emit('close')">닫기❌</button>
     </footer>
@@ -32,16 +34,14 @@ import { searchPlaces } from '@/api/place';
 
 export default {
   name: 'SearchPop',
-
   data() {
     return {
       searchQuery: '',
-      places: [], // ← 실제 검색 결과
+      places: [],
       selectedPlace: null,
       debounceTimeout: null,
     };
   },
-
   watch: {
     searchQuery(newQuery) {
       if (this.debounceTimeout) clearTimeout(this.debounceTimeout);
@@ -50,22 +50,19 @@ export default {
       }, 300);
     }
   },
-
   computed: {
     filteredPlaces() {
       return this.places;
     },
   },
-
   methods: {
     async fetchPlaces(query) {
       if (!query.trim()) {
         this.places = [];
         return;
       }
-
       try {
-        const results = await searchPlaces(query); // ex: [{ name, address, ... }]
+        const results = await searchPlaces(query);
         this.places = results.map(p => ({
           places: {
             name: p.name,
@@ -79,9 +76,7 @@ export default {
         this.places = [];
       }
     },
-
     selectPlace(place) {
-      console.log('선택한 장소:', place.places);
       this.$emit('select-place', place.places);
     },
   },
@@ -92,50 +87,58 @@ export default {
 #pop {
   display: flex;
   flex-direction: column;
-  padding: 10px;
+  margin: 10px;
   width: 300px;
   height: 90%;
   background-color: white;
   border: 3px solid skyblue;
   border-radius: 10px;
   position: absolute;
+  overflow: hidden;
 }
 
 header {
-  flex: 0 0 auto;
   width: 100%;
+  flex: 0 0 10%;
   padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+}
+
+header input {
+  width: 85%;
 }
 
 #search_input {
-  padding: 8px;
+  padding: 10px;
   border-radius: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid skyblue;
   font-size: 16px;
 }
 
 #place_list {
   width: 100%;
   height: 70%;
+  margin: 10px;
   overflow-y: auto;
 }
 
 #place_list ul {
+  width: 85%;
   list-style: none;
-  padding: 0;
+  padding: 10px;
 }
 
 #place_list li {
   padding: 8px;
   border-bottom: 1px solid #eee;
+  cursor: pointer;
 }
 
 footer {
-  flex: 0 0 auto;
+  flex: 0 0 10%;
   width: 100%;
+  margin-right: 20px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -143,8 +146,7 @@ footer {
 
 #close_btn {
   padding: 10px;
-  border-radius: 20px;
-  background-color: #dce9f5;
+  background-color: white;
   border: none;
   cursor: pointer;
 }

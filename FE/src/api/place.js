@@ -33,3 +33,12 @@ export const addPlaceToSchedule = async (userId, inputData) => {
     throw error;
   }
 };
+
+export const removePlace = async (user_id, date, place_name) => {
+  const res = await api.post('/api/users/maps/remove', {
+    user_id,
+    date,
+    place_name
+  });
+  return res.data;
+};

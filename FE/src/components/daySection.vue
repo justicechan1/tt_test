@@ -2,11 +2,11 @@
   <div class="section">
     <div class="title">
       <p>몇일 일정의 여행을 계획하고 계신가요?</p>
-      <h3>여행 날짜를 선택해주세요</h3>
+      <h3>📆 여행 날짜를 선택해주세요</h3>
     </div>
     <div class="article_section">
-      <VDatePicker v-if="range.start && range.end" v-model.range="range" mode="date"/>
-      <p>일수: {{ tripDays }}</p>
+      <VDatePicker v-model.range="range" mode="date" />
+      <p style="margin: 0">총: {{ tripDays }}일</p>
     </div>
     <footer>
       <button id="before_btn" @click="$emit('prev')">이전</button>
@@ -23,7 +23,7 @@ export default {
   data() {
     return {
       range: {
-        start: new Date(),  
+        start: new Date(),
         end: new Date()
       }
     };
@@ -41,16 +41,12 @@ export default {
     async saveDates() {
       const data = useDataStore();
 
-      const formatDate = (date) => {
-        return new Date(date).toISOString().slice(0, 10);
-      };
+      const formatDate = (date) => new Date(date).toISOString().slice(0, 10);
 
-      // Pinia에 저장
       data.setStartDay(formatDate(this.range.start));
       data.setEndDate(formatDate(this.range.end));
       data.setTripDay(this.tripDays);
 
-      // API 호출용 payload 구성
       const payload = {
         date: {
           user_id: '1',
@@ -108,9 +104,11 @@ export default {
 
 .article_section {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 10px;
+  width: 100%;
 }
 
 footer {
@@ -119,6 +117,7 @@ footer {
   justify-content: space-between;
   align-items: center;
   padding: 20px;
+  max-height: 10%;
 }
 
 #before_btn,

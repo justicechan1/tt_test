@@ -51,8 +51,7 @@ export default {
       startPlace: '',
       startTime: '',
       endPlace: '',
-      endTime: '',
-      previewPayload: null
+      endTime: ''
     }
   },
   setup() {
@@ -73,14 +72,14 @@ export default {
         date: {
           user_id: '1',
           start_date: this.startDay,
-        end_date: this.endDay
-      },
-      start_end: {
+          end_date: this.endDay
+        },
+        start_end: {
           arrival: this.startPlace,
           arrivaltime: this.startTime,
           departure: this.endPlace,
           departuretime: this.endTime
-          },
+        },
         user: {
           start_time: "09:00",
           end_time: "18:00",
@@ -94,13 +93,9 @@ export default {
         places_by_day: {}
       };
 
-      this.previewPayload = payload;
-      console.log("보내는 payload ↓↓↓");
-      console.log(JSON.stringify(payload, null, 2));
-
       try {
         await initSchedule(payload);
-        this.$router.push('/main'); // 조건 통과 시에만 라우팅
+        this.$router.push('/main');
       } catch (e) {
         console.error(e);
       }
@@ -148,17 +143,6 @@ export default {
   border: 1px solid skyblue;
   border-radius: 5px;
   font-size: 16px;
-}
-
-.payload-preview {
-  background-color: #f4f4f4;
-  border: 1px solid #ccc;
-  padding: 15px;
-  margin: 20px;
-  font-size: 14px;
-  max-height: 300px;
-  overflow-y: auto;
-  white-space: pre-wrap;
 }
 
 footer {

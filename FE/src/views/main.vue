@@ -12,9 +12,16 @@
 
     <div id="map" style="width: 100%; height: 100%;"></div>
 
-    <!-- 팝업들 -->
     <transition name="slide-popup">
-      <CalPop v-if="isCalendarPopupVisible" class="popup-panel" @close="calendar_Popup" @select-day="handleSelectDay" @loading="handleRouteLoading"/>
+      <CalPop
+        v-if="isCalendarPopupVisible"
+        class="popup-panel"
+        @close="calendar_Popup"
+        @select-day="handleSelectDay"
+        @loading="handleRouteLoading"
+        @select-place="handleSelectPlace"
+        @open-remove-place="handleOpenRemovePopup"
+      />
     </transition>
     <transition name="slide-popup">
       <SearchPop v-if="isSearchPopupVisible" class="popup-panel" @close="search_Popup" @select-place="handleSelectPlace" />
@@ -33,13 +40,30 @@
       @place-added="refreshCalendar"
     />
 
+    <RemovePlacePop
+      v-if="isRemovePopupVisible"
+      class="remove-popup"
+      @close="isRemovePopupVisible = false"
+      @refresh="refreshCalendar"
+    />
+
     <div id="category_btn">
-      <button class="category-button" @click="handleRoundButtonClick">관광명소</button>
-      <button class="category-button" @click="handleRoundButtonClick">카페</button>
-      <button class="category-button" @click="handleRoundButtonClick">음식점</button>
+      <button class="category-button" @click="() => openHashtag('관광명소')">관광명소</button>
+      <button class="category-button" @click="() => openHashtag('카페')">카페</button>
+      <button class="category-button" @click="() => openHashtag('음식점')">음식점</button>
+      <button class="category-button" @click="() => openHashtag('숙소')">숙소</button>
     </div>
 
-  <div v-if="isLoadingRoute" class="loading-overlay">
+    <HashtagButton
+      v-if="showHashtag"
+      class="hashtag-container"
+      :category="selectedCategory"
+      :viewport="currentViewport"
+      :key="selectedCategory + '-' + JSON.stringify(currentViewport)"
+      @hashtag-selected="onHashtagSelected"
+    />
+
+    <div v-if="isLoadingRoute" class="loading-overlay">
       <div class="spinner"></div>
       <p>경로 최적화 중...</p>
     </div>
@@ -51,10 +75,12 @@ import CalPop from '@/components/calender.vue';
 import SearchPop from '@/components/search.vue';
 import SavePop from '@/components/save_file.vue';
 import PlacePop from '@/components/place.vue';
+import HashtagButton from '@/components/hashtag.vue';
+import RemovePlacePop from '@/components/removePlace.vue';
 
 export default {
   name: 'MainPage',
-  components: { CalPop, SearchPop, SavePop, PlacePop },
+  components: { CalPop, SearchPop, SavePop, PlacePop, HashtagButton, RemovePlacePop },
   data() {
     return {
       selectedPlace: null,
@@ -63,11 +89,15 @@ export default {
       isSearchPopupVisible: false,
       isSavePopupVisible: false,
       isPlacePopupVisible: false,
-      isLoadingRoute: false, //로딩
+      isLoadingRoute: false,
+      isRemovePopupVisible: false,
       popupStyle: {},
       markers: [],
       polyline: [],
-      map: null
+      map: null,
+      showHashtag: false,
+      selectedCategory: null,
+      currentViewport: null
     };
   },
   methods: {
@@ -76,56 +106,34 @@ export default {
       this.isSearchPopupVisible = false;
       this.isSavePopupVisible = false;
       this.isPlacePopupVisible = false;
+      this.isRemovePopupVisible = false;
     },
-    calendar_Popup() {
-      this.togglePopup('isCalendarPopupVisible');
-    },
-    search_Popup() {
-      this.togglePopup('isSearchPopupVisible');
-    },
-    save_Popup() {
-      this.togglePopup('isSavePopupVisible');
-    },
-    place_Popup() {
-      this.togglePopup('isPlacePopupVisible');
-    },
+    calendar_Popup() { this.togglePopup('isCalendarPopupVisible'); },
+    search_Popup() { this.togglePopup('isSearchPopupVisible'); },
+    save_Popup() { this.togglePopup('isSavePopupVisible'); },
+    place_Popup() { this.togglePopup('isPlacePopupVisible'); },
     togglePopup(popupName) {
-      if (this[popupName]) {
-        this.closePopups();
-      } else {
+      if (this[popupName]) this.closePopups();
+      else {
         this.closePopups();
         this[popupName] = true;
-        this.popupStyle = {
-          position: 'absolute',
-          top: '20px',
-          left: '110px',
-          zIndex: 1000
-        };
+        this.popupStyle = { position: 'absolute', top: '20px', left: '110px', zIndex: 1000 };
       }
     },
     handleSelectPlace(place) {
-      console.log('🔥 선택된 장소:', place);
       this.selectedPlace = place;
       this.isPlacePopupVisible = true;
-      this.popupStyle = {
-        position: 'absolute',
-        top: '30px',
-        left: '420px',
-        zIndex: 1000
-      };
-      if (this.selectedMarker) {
-        this.selectedMarker.setMap(null);
-      }
+      this.popupStyle = { position: 'absolute', top: '30px', left: '420px', zIndex: 1000 };
+      if (this.selectedMarker) this.selectedMarker.setMap(null);
 
       setTimeout(() => {
         const placeData = this.$refs.placePopup?.placeData;
-
         if (placeData?.x_cord && placeData?.y_cord && this.map) {
           const latLng = new window.naver.maps.LatLng(placeData.y_cord, placeData.x_cord);
           this.selectedMarker = new window.naver.maps.Marker({
             position: latLng,
             map: this.map,
-            icon: { //마커 부분 수정 해줘잉
+            icon: {
               content: '<div style="background:tomato;color:white;padding:5px 10px;border-radius:8px;">📍</div>',
               anchor: new window.naver.maps.Point(12, 35)
             }
@@ -146,13 +154,14 @@ export default {
         this.$refs.calendarRef.SelectedDay();
       }
     },
+    handleOpenRemovePopup() {
+      this.isRemovePopupVisible = true;
+    },
     createNumberMarkerIcon(number) {
-      const svg = `
-        <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="20" cy="20" r="18" fill="skyblue" />
-          <text x="20" y="26" font-size="18" font-family="Arial" fill="white" font-weight="bold" text-anchor="middle">${number}</text>
-        </svg>
-      `;
+      const svg = `<svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="20" cy="20" r="18" fill="skyblue" />
+        <text x="20" y="26" font-size="18" font-family="Arial" fill="white" font-weight="bold" text-anchor="middle">${number}</text>
+      </svg>`;
       return 'data:image/svg+xml;base64,' + btoa(svg);
     },
     handleSelectDay({ coordinates, path }) {
@@ -160,9 +169,7 @@ export default {
       this.markers.forEach(marker => marker.setMap(null));
       this.markers = [];
 
-      if (this.polyline) {
-        this.polyline.forEach(line => line.setMap(null));
-      }
+      if (this.polyline) this.polyline.forEach(line => line.setMap(null));
       this.polyline = [];
 
       coordinates.forEach(({ x, y }, index) => {
@@ -178,15 +185,13 @@ export default {
         this.markers.push(marker);
       });
 
-      //경로 그리기
       let filteredPath = path;
       if (path.length > 1) {
         const [x1, y1] = path[0][0];
         const [xLast, yLast] = path[path.length - 1][1];
-        if (x1 === xLast && y1 === yLast) {
-          filteredPath = path.slice(0, -1);  
-        }
+        if (x1 === xLast && y1 === yLast) filteredPath = path.slice(0, -1);
       }
+
       filteredPath.forEach(segment => {
         const latLngs = segment.map(([x, y]) => new window.naver.maps.LatLng(y, x));
         const line = new window.naver.maps.Polyline({
@@ -202,15 +207,35 @@ export default {
     handleRouteLoading(isLoading) {
       this.isLoadingRoute = isLoading;
     },
+    openHashtag(label) {
+      const categoryMap = {
+        '관광명소': 'tourism',
+        '카페': 'cafe',
+        '음식점': 'restaurant',
+        '숙소': 'hotel'
+      };
+      const selectedCategory = categoryMap[label];
+      if (!this.map || !selectedCategory) return;
+
+      const bounds = this.map.getBounds();
+      this.selectedCategory = selectedCategory;
+      this.currentViewport = {
+        min_x: bounds.getSW().lng(),
+        min_y: bounds.getSW().lat(),
+        max_x: bounds.getNE().lng(),
+        max_y: bounds.getNE().lat()
+      };
+      this.showHashtag = true;
+    }
   },
   watch: {
-      isPlacePopupVisible(newVal) {
-        if (!newVal && this.selectedMarker) {
-          this.selectedMarker.setMap(null);
-          this.selectedMarker = null;
-        }
+    isPlacePopupVisible(newVal) {
+      if (!newVal && this.selectedMarker) {
+        this.selectedMarker.setMap(null);
+        this.selectedMarker = null;
       }
-    },
+    }
+  },
   mounted() {
     const script = document.createElement("script");
     script.src = "https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=f0u1dydazz";
@@ -220,13 +245,13 @@ export default {
     script.onload = () => {
       this.map = new window.naver.maps.Map("map", {
         center: new window.naver.maps.LatLng(33.4, 126.55),
-        zoom: 11,
+        zoom: 11
       });
     };
-    
-  },
+  }
 };
 </script>
+
 
 <style>
 body {
@@ -298,16 +323,39 @@ body {
 }
 
 .category-button {
-  padding: 10px 15px; /* 패딩 */
-  background-color: skyblue; /* 배경색 */
+  width: 80px; /* 너비 (원 크기) */
+  height: 80px; /* 높이 (원 크기) */
+  padding: 0; /* 패딩 제거 */
+  background-color: rgba(73, 210, 255, 0.5); /* 배경색 */
   color: white; /* 글자색 */
-  border: none; /* 테두리 제거 */
-  border-radius: 5px; /* 모서리 둥글게 */
+  border: 2px solid white; /* 테두리 제거 */
+  border-radius: 50%; /* 동그라미 모양 */
   cursor: pointer; /* 커서 변경 */
+  display: flex; /* 내용 가운데 정렬 */
+  align-items: center;
+  justify-content: center;
+  font-size: 16px; /* 글자 크기 */
+  transition: background-color 0.2s ease;
 }
 
 .category-button:hover {
   background-color: deepskyblue; /* 호버 시 색상 변경 */
+}
+
+.hashtag-container {
+  position: absolute;
+  top: 120px;
+  right: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  width: 250px;
+  height: 250px;
+  background-color: none;
+  border-radius: 5px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  z-index: 300;
 }
 
 .popup-panel {
@@ -315,6 +363,7 @@ body {
   top: 20px;
   left: 90px; /* 사이드바 바로 옆 */
   z-index: 1000;
+  overflow: visible; 
 }
 
 /* transition 효과 */
@@ -370,4 +419,5 @@ body {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
 </style>

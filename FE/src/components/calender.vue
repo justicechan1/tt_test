@@ -1,21 +1,21 @@
 <template>
   <div id="pop">
     <header>
-      <h2> 🍊{{ trip_area }}여행 </h2>
-      <p> {{ startDay }} ~ {{ endDay }} </p>
-      <p> 총 {{ tripday }}일 </p>
+      <h2>{{ trip_area }}여행</h2>
+      <p>{{ startDay }} ~ {{ endDay }}</p>
+      <p>총 {{ tripday }}일</p>
       <select v-model="selectedDay" @change="SelectedDay">
-        <option v-for="n in tripday" :key="n" :value="n - 1"> Day {{ n }} </option>
+        <option v-for="n in tripday" :key="n" :value="n - 1">Day {{ n }}</option>
       </select>
     </header>
 
     <article id="choose">
-      <hr style="border: 1px solid skyblue; width: 80%; margin: 20px auto;" />
-
       <ul v-if="currentVisits.length > 0">
         <li v-for="visit in currentVisits" :key="visit.order">
           <strong class="visit_num">{{ visit.order }}</strong>
-          <span>{{ visit.place }}</span>
+          <span @click="openPlacePopup(visit)" style="cursor: pointer; color: dodgerblue;">
+            {{ visit.place }}
+          </span>
           <p>이동시간: {{ visit.arrival_str }} ~ {{ visit.departure_str }}</p>
           <p>체류시간: {{ visit.stay_duration }}</p>
           <hr style="border: 1px solid skyblue; width: 90%; margin-right: 30px;" />
@@ -25,7 +25,8 @@
     </article>
 
     <footer>
-      <button id="close_btn" @click="$emit('close')"> 닫기❌ </button>
+      <button @click="$emit('open-remove-place')">삭제⛔</button>
+      <button id="close_btn" @click="$emit('close')">닫기❌</button>
     </footer>
   </div>
 </template>
@@ -36,11 +37,14 @@ import { getRoute } from '@/api/maps';
 
 export default {
   name: 'CalPop',
+  components: {
+  },
   data() {
     return {
       selectedDay: 0,
       routeData: [],
-      userId: localStorage.getItem('userId') ?? '1'
+      userId: localStorage.getItem('userId') ?? '1',
+      isRemovePopupVisible: false, 
     };
   },
   setup() {
@@ -77,8 +81,18 @@ export default {
         console.warn("🚫 해당 날짜의 경로 없음:", error.response?.data || error);
         this.routeData = [];
       } finally {
-        this.$emit("loading", false); 
-        }
+        this.$emit("loading", false);
+      }
+    },
+    openPlacePopup(visit) {
+      const selected = {
+        name: visit.place,
+        x_cord: visit.x_cord,
+        y_cord: visit.y_cord,
+        place_id: visit.place_id ?? null,
+        category: visit.category ?? '정보 없음'
+      };
+      this.$emit('select-place', selected);
     }
   },
   mounted() {
@@ -106,16 +120,16 @@ export default {
 }
 
 header {
-  height: 30%;
+  max-height: 30%;
   width: 100%;
   padding-left: 20px;
 }
 
 #choose {
   width: 100%;
-  height: 80%;
+  height: 70%;
   margin-top: 10px;
-  overflow-y: auto;
+  overflow-y: auto; /* 스크롤 추가 */
 }
 
 select {
@@ -138,18 +152,24 @@ select {
   margin-right: 8px;
 }
 
+.clickable {
+  cursor: pointer;
+  color: skyblue;
+  text-decoration: underline;
+}
+
 ul {
   margin: 0;
-  padding-left: 20px;
+  padding-left: 20px; /* 기본 들여쓰기 제거 */
 }
 
 li {
-  list-style-type: none;
-  margin-bottom: 8px;
+  list-style-type: none; /* 앞의 점 없애기 */
+  margin-bottom: 8px; /* 아이템 간 간격 */
 }
 
 li p {
-  margin: 0;
+  margin:0;
   color: gray;
 }
 
@@ -157,15 +177,15 @@ footer {
   height: 10%;
   width: 100%;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
 }
 
+#remove_btn,
 #close_btn {
-  padding: 10px;
+  padding: 10px 10px 10px 10px;
   background-color: white;
   border: none;
-  border-radius: 20px;
   cursor: pointer;
 }
 </style>

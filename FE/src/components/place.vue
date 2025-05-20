@@ -3,7 +3,7 @@
     <header>
       <h2 id="place_name">
         <a
-          :href="'https://www.instagram.com/explore/search/keyword/?q=' + encodeURIComponent(place.name)"
+          :href="'https://www.instagram.com/explore/search/keyword/?q=' + encodeURIComponent(placeData?.name || place.name)"
           target="_blank"
           id="instagram_link"
         >
@@ -11,7 +11,6 @@
         </a>
         {{ placeData?.name || place.name }}
       </h2>
-
       <p id="place_category"> {{ placeData?.category || '카테고리 없음' }} </p>
       <p id="place_address"> {{ placeData?.address || '주소 정보 없음' }} </p>
       <p id="running_time"> {{ placeData?.open_time || '-' }} ~ {{ placeData?.close_time || '-' }} </p>
@@ -32,17 +31,28 @@
     </article>
 
     <footer>
-      <button id="add_place" @click="addPlace"> 추가➕ </button>
-      <button id="close_btn" @click="$emit('close')"> 닫기❌ </button>
+      <button id="add_place" @click="isAddPlaceVisible = true">추가➕</button>
+      <button id="close_btn" @click="$emit('close')">닫기❌</button>
     </footer>
+
+    <!-- 중앙 팝업: AddPlace -->
+    <AddPlace
+      v-if="isAddPlaceVisible"
+      class="add-place-popup"
+      @close="isAddPlaceVisible = false"
+      @day-confirmed="addPlace"
+    />
   </div>
 </template>
 
 <script>
 import { addPlaceToSchedule, getPlaceDetail } from '@/api/place';
+import { useDataStore } from '@/store/data';
+import AddPlace from './addPlace.vue';
 
 export default {
   name: 'PlacePop',
+  components: { AddPlace },
   props: {
     place: {
       type: Object,
@@ -52,63 +62,108 @@ export default {
   data() {
     return {
       placeData: null,
-      userId: localStorage.getItem('userId') ?? ''
+      isAddPlaceVisible: false,
+      userId: localStorage.getItem('userId') ?? '1'
     };
   },
+  computed: {
+    startDay() {
+      const data = useDataStore();
+      return data.startDate;
+    }
+  },
   methods: {
-    async addPlace() {
-      const userId = 1; // 테스트 고정
-      const selectedDate = localStorage.getItem("selectedDate") || "2025-05-22";
-      const placeName = this.place.name;
-
-      const inputData = {
-        places_by_day: {
-          [selectedDate]: [{ name: placeName }]  // ✅ PlaceNameOnly 형태
-        }
-      };
-
+    async addPlace(day) {
       try {
-        await addPlaceToSchedule(userId, inputData);
+        const startDate = new Date(this.startDay);
+        startDate.setDate(startDate.getDate() + (day - 1));
+        const formattedDate = startDate.toISOString().split('T')[0];
+
+        const inputData = {
+          places_by_day: {
+            [formattedDate]: [{ name: this.place.name }]
+          }
+        };
+
+        await addPlaceToSchedule(this.userId, inputData);
         alert("✅ 일정에 추가 완료!");
+        this.isAddPlaceVisible = false;
         this.$emit("place-added");
       } catch (error) {
-        alert(`🚫 추가 실패: ${JSON.stringify(error.response?.data?.detail)}`);
+        alert(`🚫 추가 실패: ${JSON.stringify(error.response?.data?.detail || error)}`);
       }
     }
   },
   async mounted() {
-    const res = await getPlaceDetail(this.place.name);
-    this.placeData = res;
+    try {
+      const res = await getPlaceDetail(this.place.name);
+      this.placeData = res;
+    } catch (e) {
+      console.warn("장소 상세정보 불러오기 실패", e);
+      this.placeData = { name: this.place.name };
+    }
   }
 };
 </script>
 
 <style scoped>
 #pop {
+  position: relative;
   width: 350px;
   height: 70%;
   padding: 20px;
   background-color: white;
   border: 3px solid skyblue;
   border-radius: 10px;
-  position: absolute;
+  z-index: 1000;
 }
-  
+
+.add-place-popup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1100;
+}
+
 header {
-  flex: 0 0 20%; /* 상단 20% */
   margin-bottom: 10px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-} 
-
-header p{
-  margin: 0;       /* 모든 자식 요소의 기본 margin 제거 */
-  padding: 0;      /* 혹시 패딩 있으면 제거 */
-  line-height: 1;  /* 줄 간격 조절 (필요시) */
 }
 
 header h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#place_category {
+  font-size: 0.9rem;
+  color: white;
+  background-color: skyblue;
+  padding: 2px 8px;
+  border-radius: 6px;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+header p {
+  margin: 0;
+  padding: 0;
+  line-height: 1.3;
+}
+
+#instagram_link {
+  display: inline-block;
+  cursor: pointer;
+}
+
+#instagram_img {
+  width: 24px;
+  height: 24px;
   margin: 0;
 }
 
@@ -119,17 +174,6 @@ article {
   flex-direction: column;
   align-items: center;
   overflow: hidden;
-} 
-
-#instagram_link {
-  display: inline-block;
-  cursor: pointer;
-}
-
-#instagram_img {
-  width: 40px;
-  height: 40px;
-  margin: 0;
 }
 
 .image-slider {
@@ -148,26 +192,26 @@ article {
 }
 
 .slider-image {
-  width: 250px; /* 이미지 고정 너비 */
-  height: 450px; /* 이미지 고정 높이 */
+  width: 250px;
+  height: 450px;
   object-fit: cover;
   border-radius: 8px;
-  flex-shrink: 0; /* 이미지가 작아지지 않도록 */
+  flex-shrink: 0;
 }
 
 footer {
   flex: 0 0 10%;
   display: flex;
-  justify-content: space-between; /* 양쪽 끝 정렬 */
+  justify-content: space-between;
   align-items: center;
-  padding: 0 10px; /* 좌우 여백 조절 */
+  padding: 0 10px;
 }
 
 #add_place,
 #close_btn {
-  background-color: white; /* 버튼 배경색 */
-  border: none; /* 테두리 제거 */
-  padding: 8px 12px; /* 패딩 추가 */
-  cursor: pointer; /* 커서 변경 */
+  background-color: white;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
 }
 </style>
