@@ -13,7 +13,7 @@ from app.models.jeju_cafe import JejuCafe, JejuCafeHashtag
 from app.models.jeju_restaurant import JejuRestaurant, JejurestaurantHashtag
 from app.models.jeju_tourism import JejuTourism, JejutourismHashtag
 from app.models.jeju_hotel import JejuHotel, JejuhotelHashtag
-
+from app.models.jeju_transport import JejuTransport
 from app.schemas.maps import (
     HashtagInput, HashtagOutput, TagInfo,
     MoveInput, MoveResponse, MoveInfo,
@@ -28,7 +28,8 @@ PLACE_MODELS = {
     "cafe": (JejuCafe, JejuCafeHashtag),
     "restaurant": (JejuRestaurant, JejurestaurantHashtag),
     "tourism": (JejuTourism, JejutourismHashtag),
-    "hotel": (JejuHotel, JejuhotelHashtag)
+    "hotel": (JejuHotel, JejuhotelHashtag),
+    "transport": (JejuTransport, None)
 }
 
 PRIMARY_KEY_FIELDS = {
@@ -129,7 +130,7 @@ def convert_to_move_response(data: dict) -> RouteResponse:
     def is_same_coord(p1, p2, tol=1e-6):
         return abs(p1[0] - p2[0]) < tol and abs(p1[1] - p2[1]) < tol
 
-    # ✅ 시작점과 마지막 segment의 도착지가 같으면 제거
+    # 시작점과 마지막 segment의 도착지가 같으면 제거
     if len(path) >= 2:
         first = path[0][0]
         last = path[-1][1]
@@ -159,6 +160,24 @@ def get_day_info(user_id: str, target_date: str) -> dict:
         "weekday": weekdays_kor[weekday_index]
     }
 
+# 카테고리 키워드 매핑
+CATEGORY_KEYWORD_MAPPING = {
+    "accommodation": ["숙박", "호텔"],
+    "restaurant": ["음식점", "가정식"],
+    "landmark": ["산"],
+    "transport": ["transport"]
+}
+
+def map_category_by_keywords(raw_category: str, default_category: str) -> str:
+    if not raw_category:
+        return default_category
+
+    lower_category = raw_category.lower()
+    for mapped_category, keywords in CATEGORY_KEYWORD_MAPPING.items():
+        if any(keyword in lower_category for keyword in keywords):
+            return mapped_category
+    return default_category
+
 # ---------- route 입력을 위한 dict 구성 ----------
 def build_schedule_input(user_id: str, target_date: str, db: Session) -> dict:
     if user_id not in user_schedules:
@@ -168,7 +187,7 @@ def build_schedule_input(user_id: str, target_date: str, db: Session) -> dict:
     places_by_day = schedule_data["places_by_day"]
     user_info = schedule_data["user"]
 
-    # ✅ 해당 날짜의 장소가 없거나 비어 있으면 빈 리스트 반환
+    # 해당 날짜의 장소가 없거나 비어 있으면 빈 리스트 반환
     if target_date not in places_by_day or not places_by_day[target_date]:
         return {
             "places": [],
@@ -185,12 +204,15 @@ def build_schedule_input(user_id: str, target_date: str, db: Session) -> dict:
                 func.trim(func.lower(PlaceModel.name)) == func.trim(func.lower(place_name))
             ).first()
             if db_place:
+                original_category = category
+                mapped_category = map_category_by_keywords(db_place.category, original_category)
+
                 place_objs.append({
                     "id": db_place.id,
                     "name": db_place.name,
                     "x_cord": float(db_place.x_cord),
                     "y_cord": float(db_place.y_cord),
-                    "category": category,
+                    "category": mapped_category,
                     "open_time": db_place.open_time or "00:00",
                     "close_time": db_place.close_time or "23:59",
                     "service_time": int(db_place.service_time or 0),
@@ -216,15 +238,19 @@ def get_optimal_route(input_data: RouteInput, db: Session = Depends(get_db)):
         db=db
     )
 
-    # ✅ 장소가 하나도 없는 경우 빈 결과 반환
+    # 장소가 하나도 없는 경우 빈 결과 반환
     if not input_dict["places"]:
         return RouteResponse(visits=[], path=[])
 
-    # 🧠 경로 최적화 실행
+    # 경로 최적화 실행
     result = schedule_trip(input_dict)
 
-    # 📌 순서 저장 및 일정 갱신
-    ordered_place_names = [visit["place"] for visit in result.get("visits", [])]
+    if not result.get("visits"):
+        print("⚠️ 경로 최적화 실패: 기존 일정 유지")
+        return RouteResponse(visits=[], path=[])
+
+    # 최적화 성공한 경우에만 places_by_day 갱신
+    ordered_place_names = [visit["place"] for visit in result["visits"]]
     original_places = user_schedules[input_data.user_id]["places_by_day"][input_data.date]
     name_to_place = {
         place.name if not isinstance(place, dict) else place["name"]: place

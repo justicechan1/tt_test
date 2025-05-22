@@ -3,12 +3,12 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
-from typing import Dict, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.models.jeju_cafe import JejuCafe
 from app.models.jeju_restaurant import JejuRestaurant
 from app.models.jeju_tourism import JejuTourism
 from app.models.jeju_hotel import JejuHotel
+from app.models.jeju_transport import JejuTransport
 from app.cache import user_schedules
 from app.schemas import (
     ScheduleInitInput, ScheduleInitOutput,
@@ -22,7 +22,8 @@ PLACE_MODELS = {
     "cafe": (JejuCafe),
     "restaurant": (JejuRestaurant),
     "tourism": (JejuTourism),
-    "hotel": (JejuHotel)
+    "hotel": (JejuHotel),
+    "transport": (JejuTransport)
 }
 
 # ---------- /init ----------
@@ -38,15 +39,48 @@ def init_schedule(input_data: ScheduleInitInput, db: Session = Depends(get_db)):
     }
     enriched_places_by_day = {}
 
-    for date, places in input_data.places_by_day.items():
+    start_date = input_data.date.start_date
+    end_date = input_data.date.end_date
+
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    day_count = (end_dt - start_dt).days + 1
+
+    for i in range(day_count):
+        date = (start_dt + timedelta(days=i)).strftime("%Y-%m-%d")
+        places = input_data.places_by_day.get(date, [])
         enriched_places = []
 
+        # 1. 도착지 추가 (첫날 맨 앞)
+        if date == start_date:
+            arrival_name = input_data.start_end.arrival
+            for category, PlaceModel in PLACE_MODELS.items():
+                db_place = db.query(PlaceModel).filter(
+                    func.trim(func.lower(PlaceModel.name)) == func.trim(func.lower(arrival_name))
+                ).first()
+                if db_place:
+                    enriched_places.append(PlaceDetailOutput(
+                        id=db_place.id,
+                        name=db_place.name,
+                        x_cord=float(db_place.x_cord),
+                        y_cord=float(db_place.y_cord),
+                        category=category,
+                        open_time=input_data.start_end.arrivaltime,
+                        close_time="",
+                        service_time=int(db_place.service_time or 0),
+                        tags=getattr(db_place, "tags", []) or [],
+                        closed_days=getattr(db_place, "closed_days", []) or [],
+                        break_time=getattr(db_place, "break_time", []) or [],
+                        is_mandatory=True
+                    ))
+                    break
+
+        # 2. 일반 장소들
         for place in places:
             for category, PlaceModel in PLACE_MODELS.items():
                 db_place = db.query(PlaceModel).filter(
                     func.trim(func.lower(PlaceModel.name)) == func.trim(func.lower(place.name))
                 ).first()
-
                 if db_place:
                     enriched_places.append(PlaceDetailOutput(
                         id=db_place.id,
@@ -64,6 +98,30 @@ def init_schedule(input_data: ScheduleInitInput, db: Session = Depends(get_db)):
                     ))
                     break
 
+        # 3. 출발지 추가 (마지막 날 맨 뒤)
+        if date == end_date:
+            departure_name = input_data.start_end.departure
+            for category, PlaceModel in PLACE_MODELS.items():
+                db_place = db.query(PlaceModel).filter(
+                    func.trim(func.lower(PlaceModel.name)) == func.trim(func.lower(departure_name))
+                ).first()
+                if db_place:
+                    enriched_places.append(PlaceDetailOutput(
+                        id=db_place.id,
+                        name=db_place.name,
+                        x_cord=float(db_place.x_cord),
+                        y_cord=float(db_place.y_cord),
+                        category=category,
+                        open_time="",
+                        close_time=input_data.start_end.departuretime,
+                        service_time=int(db_place.service_time or 0),
+                        tags=getattr(db_place, "tags", []) or [],
+                        closed_days=getattr(db_place, "closed_days", []) or [],
+                        break_time=getattr(db_place, "break_time", []) or [],
+                        is_mandatory=True
+                    ))
+                    break
+
         enriched_places_by_day[date] = enriched_places
 
     user_schedules[user_id]["places_by_day"] = enriched_places_by_day
@@ -73,6 +131,7 @@ def init_schedule(input_data: ScheduleInitInput, db: Session = Depends(get_db)):
         start_end=input_data.start_end,
         places_by_day=enriched_places_by_day
     )
+
 
 # ---------- /init_show ----------
 @router.get("/init_show", response_model=ScheduleShowOutput)

@@ -98,7 +98,7 @@ def convert_to_day_keys(places_by_day: Dict[str, List], start_date_str: str) -> 
     result = {}
     for date_str in sorted(places_by_day.keys()):
         current_date = datetime.strptime(date_str, "%Y-%m-%d")
-        day_index = (current_date - start_date).days + 1
+        day_index = (current_date - start_date).days
         day_key = f"Day {day_index}"
         result[day_key] = [
             PlaceNameOnly(name=p["name"] if isinstance(p, dict) else p.name)
