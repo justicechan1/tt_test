@@ -6,9 +6,10 @@ from sqlalchemy import func
 import re
 from datetime import datetime
 from typing import List
-from app.cache import user_schedules
+from app.cache import user_schedules, selected_category_cache
 from app.database import get_db
-
+import json 
+import numpy as np
 from app.models.jeju_cafe import JejuCafe, JejuCafeHashtag
 from app.models.jeju_restaurant import JejuRestaurant, JejurestaurantHashtag
 from app.models.jeju_tourism import JejuTourism, JejutourismHashtag
@@ -17,9 +18,10 @@ from app.models.jeju_transport import JejuTransport
 from app.schemas.maps import (
     HashtagInput, HashtagOutput, TagInfo,
     MoveInput, MoveResponse, MoveInfo,
-    RouteInput, RouteResponse, VisitInfo
+    RouteInput, RouteResponse, VisitInfo,
+    Viewport
 )
-
+from app.core.search import search_similar_places
 from TripScheduler.tripscheduler.scheduler_api import schedule_trip
 
 router = APIRouter(prefix="/api/users/maps", tags=["maps"])
@@ -35,11 +37,10 @@ PLACE_MODELS = {
 PRIMARY_KEY_FIELDS = {
     "cafe": "cafe_id",
     "restaurant": "restaurant_id",
-    "tourism": "tourism_id",
+    "tourism": "tour_id",
     "hotel": "hotel_id"
 }
 
-# ---------- /hashtage ----------
 @router.post("/hashtage", response_model=HashtagOutput)
 def get_hashtags(input_data: HashtagInput, db: Session = Depends(get_db)):
     category = input_data.category.lower()
@@ -47,6 +48,9 @@ def get_hashtags(input_data: HashtagInput, db: Session = Depends(get_db)):
 
     if category not in PLACE_MODELS:
         raise HTTPException(status_code=400, detail="Invalid category")
+
+    # ✅ 카테고리 캐시 저장 (단일 사용자 가정)
+    selected_category_cache["current"] = category
 
     PlaceModel, HashtagModel = PLACE_MODELS[category]
     pk_field = getattr(PlaceModel, PRIMARY_KEY_FIELDS[category])
@@ -57,67 +61,122 @@ def get_hashtags(input_data: HashtagInput, db: Session = Depends(get_db)):
         PlaceModel.y_cord.between(viewport.min_y, viewport.max_y)
     ).subquery()
 
-    hashtag_rows = db.query(HashtagModel.hashtag_name).filter(
-        fk_field.in_(subquery)
+    hashtag_rows = db.query(HashtagModel.hashtage_name).filter(
+        fk_field.in_(subquery),
+        HashtagModel.hashtage_name.isnot(None)
     ).all()
 
     unique_tags = set()
     for row in hashtag_rows:
-        if not row.hashtag_name:
+        if not row.hashtage_name:
             continue
         try:
-            tags = re.findall(r'\["(#[^"]+)"\]', row.hashtag_name)
+            tags = re.findall(r'#\w+', row.hashtage_name)
             unique_tags.update(tags)
-        except:
-            continue
+        except Exception as e:
+            print(f"❌ 해시태그 파싱 실패: {e}")
 
-    return HashtagOutput(tag=[TagInfo(hashtag_name=tag) for tag in unique_tags])
+    print(f"✅ 최종 해시태그 목록: {list(unique_tags)}")
+    return HashtagOutput(tag=[TagInfo(hashtage_name=tag) for tag in unique_tags])
 
-# ---------- /move ----------
+def get_places_in_viewport(category: str, viewport: Viewport, db: Session) -> List[MoveInfo]:
+    if category not in PLACE_MODELS:
+        raise HTTPException(status_code=400, detail="Invalid category")
+
+    PlaceModel, _ = PLACE_MODELS[category]
+
+    places = db.query(PlaceModel).filter(
+        PlaceModel.x_cord.between(viewport.min_x, viewport.max_x),
+        PlaceModel.y_cord.between(viewport.min_y, viewport.max_y)
+    ).all()
+
+    results = []
+    for place in places:
+        print(f"📍 선택된 장소: {place.name} ({place.x_cord}, {place.y_cord})")
+        results.append(MoveInfo(
+            name=place.name,
+            x_cord=float(place.x_cord),
+            y_cord=float(place.y_cord)
+        ))
+
+    return results
+def collect_place_embeddings(db, PlaceModel, HashtagModel, pk_field_name, viewport):
+    places = db.query(PlaceModel).filter(
+        PlaceModel.x_cord.between(viewport.min_x, viewport.max_x),
+        PlaceModel.y_cord.between(viewport.min_y, viewport.max_y)
+    ).all()
+
+    embedding_logs = []
+    for place in places:
+        place_id = getattr(place, pk_field_name)
+        if HashtagModel:
+            rows = db.query(HashtagModel.embeddings).filter(
+                getattr(HashtagModel, pk_field_name) == place_id,
+                HashtagModel.embeddings.isnot(None)
+            ).all()
+            emb_list = [np.array(e[0], dtype=np.float32).reshape(1, -1) for e in rows if e[0] is not None]
+            if emb_list:
+                embedding_logs.append({
+                    "id": place_id,
+                    "embedding": np.vstack(emb_list)
+                })
+    return embedding_logs
+
+def collect_selected_embeddings(db, HashtagModel, tags, seen_embeddings: set):
+    selected = []
+    for tag in tags:
+        rows = db.query(HashtagModel.hashtage_name, HashtagModel.embeddings).filter(
+            HashtagModel.hashtage_name.like(f"%{tag}%")
+        ).all()
+        for name, embedding in rows:
+            if embedding is None:
+                continue
+            key = str(embedding)
+            if key in seen_embeddings:
+                continue
+            seen_embeddings.add(key)
+            selected.append(np.array(embedding, dtype=np.float32).reshape(1, -1))
+    return selected
+
+def get_top_place_ids(selected_embeddings, embedding_logs):
+    top_ids = set()
+    for query_vector in selected_embeddings:
+        top_results = search_similar_places(query_vector.T, embedding_logs, top_k=5)
+        for res in top_results:
+            top_ids.add(res["place_id"])
+    return top_ids
+
+def build_filtered_move_response(db, PlaceModel, pk_field_name, place_ids):
+    move_infos = []
+    for pid in place_ids:
+        db_place = db.query(PlaceModel).filter(getattr(PlaceModel, pk_field_name) == pid).first()
+        if db_place:
+            move_infos.append(MoveInfo(
+                name=db_place.name,
+                x_cord=float(db_place.x_cord),
+                y_cord=float(db_place.y_cord)
+            ))
+    return move_infos
+
 @router.post("/move", response_model=MoveResponse)
 def get_move_candidates(input_data: MoveInput, db: Session = Depends(get_db)):
-    tags = [t.hashtag_name for t in input_data.tag]
     viewport = input_data.viewport
-    results = []
+    tags = [t.hashtage_name for t in input_data.tag]
 
-    for category, (PlaceModel, HashtagModel) in PLACE_MODELS.items():
-        pk_field_name = PRIMARY_KEY_FIELDS[category]
-        pk_field = getattr(PlaceModel, pk_field_name)
-        fk_field = getattr(HashtagModel, pk_field_name)
+    category = selected_category_cache.get("current")
+    if not category or category not in PLACE_MODELS:
+        raise HTTPException(status_code=400, detail="No category selected or invalid")
 
-        subquery = db.query(pk_field).filter(
-            PlaceModel.x_cord.between(viewport.min_x, viewport.max_x),
-            PlaceModel.y_cord.between(viewport.min_y, viewport.max_y)
-        ).subquery()
+    PlaceModel, HashtagModel = PLACE_MODELS[category]
+    pk_field_name = PRIMARY_KEY_FIELDS[category]
 
-        tagged_ids = db.query(fk_field).filter(
-            fk_field.in_(subquery),
-            HashtagModel.hashtag_name.isnot(None)
-        ).all()
+    embedding_logs = collect_place_embeddings(db, PlaceModel, HashtagModel, pk_field_name, viewport)
+    selected_embeddings = collect_selected_embeddings(db, HashtagModel, tags, seen_embeddings=set())
+    top_place_ids = get_top_place_ids(selected_embeddings, embedding_logs)
+    filtered_places = build_filtered_move_response(db, PlaceModel, pk_field_name, top_place_ids)
 
-        for place_id, in tagged_ids:
-            hashtag_entry = db.query(HashtagModel).filter(
-                getattr(HashtagModel, pk_field_name) == place_id
-            ).first()
-            if not hashtag_entry or not hashtag_entry.hashtag_name:
-                continue
+    return MoveResponse(move=filtered_places)
 
-            try:
-                place_tags = re.findall(r'\["(#[^"]+)"\]', hashtag_entry.hashtag_name)
-                if not any(tag in place_tags for tag in tags):
-                    continue
-            except:
-                continue
-
-            place = db.query(PlaceModel).filter(pk_field == place_id).first()
-            if place:
-                results.append(MoveInfo(
-                    name=place.name,
-                    x_cord=float(place.x_cord),
-                    y_cord=float(place.y_cord)
-                ))
-
-    return MoveResponse(move=results)
 
 # ---------- 경로 결과 포맷 변환 ----------
 def is_same_coord(p1, p2, tol=1e-6):
@@ -162,9 +221,35 @@ def get_day_info(user_id: str, target_date: str) -> dict:
 
 # 카테고리 키워드 매핑
 CATEGORY_KEYWORD_MAPPING = {
-    "accommodation": ["숙박", "호텔"],
-    "restaurant": ["음식점", "가정식"],
-    "landmark": ["산"],
+    "accommodation": [
+        "숙박", "호텔", "모텔", "리조트", "리조트부속건물", "펜션", "펜션부속시설",
+        "게스트하우스", "민박", "전통숙소", "생활형숙박시설", "쉐어하우스", "레지던스",
+        "여관", "원룸"
+        ],
+    "restaurant": [
+        "음식점", "가정식", "갈비탕", "감자탕", "게요리", "고기요리", "곰탕", "곱창", "국밥", "국수",
+        "김밥", "꼬치", "낙지요리", "닭갈비", "닭강정", "닭발", "닭볶음탕", "닭요리", "덮밥", "도넛",
+        "도시락", "돈가스", "돼지고기구이", "두부요리", "라면", "마라탕", "막국수", "만두", "매운탕",
+        "백숙", "보리밥", "보쌈", "복어요리", "분식", "불닭", "뷔페", "브런치", "브런치카페", "비빔밥",
+        "생선구이", "생선요리", "생선회", "샌드위치", "샐러드", "샐러드뷔페", "샤브샤브", "소고기구이",
+        "소바", "순대", "술집", "스테이크", "스파게티", "아귀찜", "아이스크림", "양갈비", "양꼬치",
+        "양식", "오니기리", "오리요리", "오징어요리", "요리주점", "이자카야", "이탈리아음식", "일식당",
+        "일품순두부", "전", "전골", "전복요리", "주꾸미요리", "죽", "중식당", "중식만두", "찐빵", "찜닭",
+        "케이크전문", "토스트", "포장마차", "푸드코트", "푸드트럭", "퓨전음식", "핫도그", "해장국",
+        "햄버거", "향토음식", "호떡"
+        ],
+    "landmark": [
+        "산", "계곡", "해변", "폭포", "섬", "호수", "동굴", "숲", "평야", "저수지",
+        "자연", "자연명소", "자연공원", "봉우리", "명소", "유적", "유적지", "사찰",
+        "성곽명", "기념관", "기념물", "문화", "문화시설", "문화원", "박물관", "미술관",
+        "기념품", "전시관", "홍보관", "체험", "체험여행", "체험마을", "관광농원",
+        "관광안내소", "관광민예품", "관광선", "유원지", "테마공원", "테마파크", "놀이기구",
+        "워터파크", "눈썰매장", "레일바이크", "ATV체험장", "승마장", "스킨스쿠버", "서핑",
+        "실내놀이터", "실내서핑", "캠핑", "해양레저", "항공레저", "짚라인", "드라이브",
+        "레저", "레포츠시설", "요트", "잠수함", "배낚시", "전망대", "일출명소", "등산코스",
+        "산책로", "수목원", "근린공원", "공원", "등대", "오름", "항구", "선착장",
+        "도보코스", "명상", "템플스테이"
+        ],
     "transport": ["transport"]
 }
 

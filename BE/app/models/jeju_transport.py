@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, Float, Boolean, Text, JSON
 from app.database import Base
 
 class JejuTransport(Base):
-    __tablename__ = "jeju_transport"
+    __tablename__ = "transport"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(255), nullable=False)

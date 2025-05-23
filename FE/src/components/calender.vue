@@ -25,7 +25,10 @@
     </article>
 
     <footer>
-      <button @click="$emit('open-remove-place')">삭제⛔</button>
+      <button id="remove_btn" @click="openRemovePlace">
+        삭제⛔
+      </button>
+
       <button id="close_btn" @click="$emit('close')">닫기❌</button>
     </footer>
   </div>
@@ -93,7 +96,47 @@ export default {
         category: visit.category ?? '정보 없음'
       };
       this.$emit('select-place', selected);
-    }
+    },
+    openRemovePopup() {
+      const dateList = [];
+      const date = new Date(this.startDay);
+      for (let i = 0; i < this.tripday; i++) {
+        const current = new Date(date);
+        current.setDate(current.getDate() + i);
+        dateList.push(current.toISOString().split('T')[0]);
+      }
+      this.$emit('open-remove-place', dateList);
+    },
+    openRemovePlace() {
+      const dateList = [];
+      const visitsByDate = {};
+      const baseDate = new Date(this.startDay);
+
+      for (let i = 0; i < this.tripday; i++) {
+        const day = new Date(baseDate);
+        day.setDate(baseDate.getDate() + i);
+        const formattedDate = day.toISOString().split('T')[0];
+        dateList.push(formattedDate);
+        visitsByDate[formattedDate] = []; // 초기화
+
+    // getRoute로 각 날짜의 방문지 조회
+      }
+
+      const fetchVisits = async () => {
+        const promises = dateList.map(date =>
+          getRoute(this.userId, date).then(res => {
+          visitsByDate[date] = res.visits || [];
+          }).catch(() => {
+            visitsByDate[date] = [];
+          })
+        );
+
+        await Promise.all(promises);
+        this.$emit('open-remove-place', dateList, visitsByDate);
+      };
+
+      fetchVisits();
+    } 
   },
   mounted() {
     this.SelectedDay();

@@ -1,8 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, Text, DECIMAL
+from sqlalchemy import Column, Integer, String, Float, Text, DECIMAL, JSON
 from app.database import Base
 
 class JejuCafe(Base):
-    __tablename__ = "jeju_cafe"
+    __tablename__ = "cafe"
 
     cafe_id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255))
@@ -30,11 +30,13 @@ class JejuCafe(Base):
         orm_mode = True
 
 class JejuCafeHashtag(Base):
-    __tablename__ = "jeju_cafe_hashtags"  
+    __tablename__ = "jeju_cafe_hashtags"
 
-    cafe_id = Column(Integer, primary_key=True)
-    name = Column(String(255))
-    hashtag_name = Column(Text)  
+    id = Column(Integer, primary_key=True)  
+    cafe_id = Column(Integer)
+    name = Column(String(100))
+    hashtage_name = Column(String(100))  
+    embeddings = Column(JSON)
 
     class Config:
         orm_mode = True

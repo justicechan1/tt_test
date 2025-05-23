@@ -76,8 +76,9 @@ export default {
     async addPlace(day) {
       try {
         const startDate = new Date(this.startDay);
-        startDate.setDate(startDate.getDate() + (day - 1));
-        const formattedDate = startDate.toISOString().split('T')[0];
+        startDate.setDate(startDate.getDate() + day);
+
+        const formattedDate = startDate.toISOString().split('T')[0]; 
 
         const inputData = {
           places_by_day: {

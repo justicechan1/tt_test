@@ -34,11 +34,12 @@ export const addPlaceToSchedule = async (userId, inputData) => {
   }
 };
 
-export const removePlace = async (user_id, date, place_name) => {
-  const res = await api.post('/api/users/maps/remove', {
-    user_id,
-    date,
-    place_name
-  });
-  return res.data;
+export const removePlace = async (userId, inputData) => {
+  try {
+    const res = await api.post(`/api/places/remove?user_id=${userId}`, inputData);
+    return res.data;
+  } catch (error) {
+    console.error("removePlace 실패:", error.response?.data || error);
+    throw error;
+  }
 };

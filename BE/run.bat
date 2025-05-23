@@ -1,3 +1,3 @@
 @echo off
 set PYTHONPATH=%CD%\TripScheduler
-uvicorn app.main:app
+uvicorn app.main:app --reload

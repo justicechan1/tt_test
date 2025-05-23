@@ -7,3 +7,6 @@ user_schedules: dict[str, dict] = {}
 place_cache: dict = {
     "places_by_day": {}
 }
+
+# 최근 선택된 카테고리 저장 (user_id -> category)
+selected_category_cache: dict[str, str] = {}

@@ -40,8 +40,10 @@
       @place-added="refreshCalendar"
     />
 
-    <RemovePlacePop
+    <RemovePlace
       v-if="isRemovePopupVisible"
+      :date-list="removeDateList"
+      :visits-by-date="removeVisitsByDate"
       class="remove-popup"
       @close="isRemovePopupVisible = false"
       @refresh="refreshCalendar"
@@ -76,11 +78,11 @@ import SearchPop from '@/components/search.vue';
 import SavePop from '@/components/save_file.vue';
 import PlacePop from '@/components/place.vue';
 import HashtagButton from '@/components/hashtag.vue';
-import RemovePlacePop from '@/components/removePlace.vue';
+import RemovePlace from '@/components/removePlace.vue';
 
 export default {
   name: 'MainPage',
-  components: { CalPop, SearchPop, SavePop, PlacePop, HashtagButton, RemovePlacePop },
+  components: { CalPop, SearchPop, SavePop, PlacePop, HashtagButton, RemovePlace },
   data() {
     return {
       selectedPlace: null,
@@ -91,6 +93,9 @@ export default {
       isPlacePopupVisible: false,
       isLoadingRoute: false,
       isRemovePopupVisible: false,
+      removeVisitsByDate: {},
+      removeDateList: [],
+      RemovePlaceStyle: {},
       popupStyle: {},
       markers: [],
       polyline: [],
@@ -154,14 +159,18 @@ export default {
         this.$refs.calendarRef.SelectedDay();
       }
     },
-    handleOpenRemovePopup() {
+    handleOpenRemovePopup(date, visits) {
+      this.removeDateList = [date]; // 선택된 날짜만 전달
+      this.removeVisitsByDate = { [date]: visits }; // 해당 날짜의 장소들만 전달
       this.isRemovePopupVisible = true;
     },
     createNumberMarkerIcon(number) {
-      const svg = `<svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="20" cy="20" r="18" fill="skyblue" />
-        <text x="20" y="26" font-size="18" font-family="Arial" fill="white" font-weight="bold" text-anchor="middle">${number}</text>
-      </svg>`;
+      const svg = `
+        <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="18" fill="skyblue" />
+          <text x="20" y="26" font-size="18" font-family="Arial" fill="white" font-weight="bold" text-anchor="middle">${number}</text>
+        </svg>
+      `;
       return 'data:image/svg+xml;base64,' + btoa(svg);
     },
     handleSelectDay({ coordinates, path }) {

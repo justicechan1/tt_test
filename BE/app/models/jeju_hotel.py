@@ -3,7 +3,7 @@ from sqlalchemy import Column, Integer, String, Float, Text, DECIMAL
 from app.database import Base
 
 class JejuHotel(Base):
-    __tablename__ = "jeju_hotel"
+    __tablename__ = "hotel"
 
     hotel_id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255))
@@ -35,7 +35,7 @@ class JejuhotelHashtag(Base):
 
     hotel_id = Column(Integer, primary_key=True)
     name = Column(String(255))
-    hashtag_name = Column(Text)  
+    hashtage_name = Column(Text)  
 
     class Config:
         orm_mode = True

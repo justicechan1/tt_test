@@ -3,9 +3,9 @@ from sqlalchemy import Column, Integer, String, Float, Text, DECIMAL
 from app.database import Base
 
 class JejuTourism(Base):
-    __tablename__ = "jeju_tourism"
+    __tablename__ = "tour"
 
-    tourism_id = Column(Integer, primary_key=True, autoincrement=True)
+    tour_id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255))
     category = Column(String(255))
     page_url = Column(Text)
@@ -25,7 +25,7 @@ class JejuTourism(Base):
 
     @property
     def id(self):
-        return self.tourism_id
+        return self.tour_id
     
     class Config:
         orm_mode = True
@@ -33,9 +33,9 @@ class JejuTourism(Base):
 class JejutourismHashtag(Base):
     __tablename__ = "jeju_tourism_hashtags"  
 
-    tourism_id = Column(Integer, primary_key=True)
+    tour_id = Column(Integer, primary_key=True)
     name = Column(String(255))
-    hashtag_name = Column(Text)  
+    hashtage_name = Column(Text)  
 
     class Config:
         orm_mode = True

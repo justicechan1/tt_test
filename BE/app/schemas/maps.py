@@ -6,7 +6,7 @@ from typing import List, Optional
 # ---------- 해시태그 (Hashtage) ----------
 
 class TagInfo(BaseModel):
-    hashtag_name: str
+    hashtage_name: str
 
 class Viewport(BaseModel):
     min_x: float

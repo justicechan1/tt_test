@@ -4,7 +4,7 @@
     <div class="radio-container">
       <div v-for="n in tripDay" :key="n">
         <label>
-          <input v-model="trip_day" type="radio" :value="n" /> Day {{ n }} 
+          <input v-model="trip_day" type="radio" :value="n - 1" /> Day {{ n }}
         </label>
       </div>
     </div>

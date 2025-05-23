@@ -1,10 +1,9 @@
 <template>
-  <div v-if="dateList.length > 0" id="selectDayPlace">
+  <div id="selectDayPlace"> 
     <h4> 어떤 일정을 삭제하실건가요? </h4>
-
     <select v-model="selectedDay" @change="updateVisits">
       <option v-for="(date, index) in dateList" :key="index" :value="index">
-        Day {{ index + 1 }} - {{ date }}
+        Day {{ index + 1 }}
       </option>
     </select>
 
@@ -18,51 +17,58 @@
 
     <div class="btn-container">
       <button id="close_btn" @click="$emit('close')">닫기❌</button>
-      <button id="select_btn" @click="confirmSelection">삭제</button>
+      <button id="select_btn" @click="confirmSelection">확인</button>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
-import { removePlace } from '@/api/maps';
+import { ref, onMounted, watch } from 'vue';
 import { useDataStore } from '@/store/data';
+import { removePlace } from '@/api/maps';
 
 export default {
-  name: 'RemovePlace',
+  name: 'RemovePlacePop',
+  props: {
+    dateList: {
+      type: Array,
+      required: true
+    },
+    visitsByDate: {
+      type: Object,
+      required: true
+    }
+  },
   setup(props, { emit }) {
-    const dataStore = useDataStore();
-
-    // ✅ null 보호
-    const dateList = dataStore.dateList || [];
-    const tripDay = ref(dateList.length);
     const selectedDay = ref(0);
     const selectedPlace = ref(null);
     const currentVisits = ref([]);
+    const dataStore = useDataStore();
 
     const updateVisits = () => {
-      const selectedDate = dateList[selectedDay.value];
-      currentVisits.value = dataStore.visits?.[selectedDate] || [];
+      const selectedDate = props.dateList[selectedDay.value];
+      currentVisits.value = props.visitsByDate?.[selectedDate] || [];
     };
 
-    onMounted(() => {
-      if (dateList.length > 0) updateVisits();
-    });
+    onMounted(updateVisits);
+    watch(selectedDay, updateVisits);
 
     const confirmSelection = async () => {
       if (!selectedPlace.value) {
         alert("삭제할 장소를 선택하세요.");
         return;
       }
-
-      const date = dateList[selectedDay.value];
-      const place_name = selectedPlace.value;
-
       try {
-        await removePlace(dataStore.userId, date, place_name);
+        const selectedDate = props.dateList[selectedDay.value];
+        const payload = {
+          places_by_day: {
+            [selectedDate]: [{ name: selectedPlace.value }]
+          }
+        };
+        await removePlace(dataStore.userId, payload);
         alert("장소가 삭제되었습니다.");
         emit("close");
-        emit("refresh"); // CalPop.vue 갱신
+        emit("refresh");
       } catch (err) {
         console.error("삭제 실패:", err);
         alert("장소 삭제에 실패했습니다.");
@@ -70,13 +76,11 @@ export default {
     };
 
     return {
-      tripDay,
-      dateList,
       selectedDay,
       selectedPlace,
       currentVisits,
       updateVisits,
-      confirmSelection
+      confirmSelection,
     };
   }
 };
@@ -91,6 +95,9 @@ export default {
   border: 3px solid skyblue;
   border-radius: 10px;
   position: absolute;
+  top: 30px;
+  left: 420px;
+  z-index: 1000;
 }
 
 h4, h5 {
