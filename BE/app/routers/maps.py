@@ -41,6 +41,7 @@ PRIMARY_KEY_FIELDS = {
     "hotel": "hotel_id"
 }
 
+# ---------- /hashtage ----------
 @router.post("/hashtage", response_model=HashtagOutput)
 def get_hashtags(input_data: HashtagInput, db: Session = Depends(get_db)):
     category = input_data.category.lower()
@@ -49,7 +50,7 @@ def get_hashtags(input_data: HashtagInput, db: Session = Depends(get_db)):
     if category not in PLACE_MODELS:
         raise HTTPException(status_code=400, detail="Invalid category")
 
-    # ✅ 카테고리 캐시 저장 (단일 사용자 가정)
+    # 카테고리 캐시 저장
     selected_category_cache["current"] = category
 
     PlaceModel, HashtagModel = PLACE_MODELS[category]
@@ -76,9 +77,9 @@ def get_hashtags(input_data: HashtagInput, db: Session = Depends(get_db)):
         except Exception as e:
             print(f"❌ 해시태그 파싱 실패: {e}")
 
-    print(f"✅ 최종 해시태그 목록: {list(unique_tags)}")
     return HashtagOutput(tag=[TagInfo(hashtage_name=tag) for tag in unique_tags])
 
+# ---------- Viewport 내 장소 조회 ----------
 def get_places_in_viewport(category: str, viewport: Viewport, db: Session) -> List[MoveInfo]:
     if category not in PLACE_MODELS:
         raise HTTPException(status_code=400, detail="Invalid category")
@@ -92,7 +93,6 @@ def get_places_in_viewport(category: str, viewport: Viewport, db: Session) -> Li
 
     results = []
     for place in places:
-        print(f"📍 선택된 장소: {place.name} ({place.x_cord}, {place.y_cord})")
         results.append(MoveInfo(
             name=place.name,
             x_cord=float(place.x_cord),
@@ -100,6 +100,8 @@ def get_places_in_viewport(category: str, viewport: Viewport, db: Session) -> Li
         ))
 
     return results
+
+# ---------- 장소별 해시태그 임베딩 수집 ----------
 def collect_place_embeddings(db, PlaceModel, HashtagModel, pk_field_name, viewport):
     places = db.query(PlaceModel).filter(
         PlaceModel.x_cord.between(viewport.min_x, viewport.max_x),
@@ -122,6 +124,7 @@ def collect_place_embeddings(db, PlaceModel, HashtagModel, pk_field_name, viewpo
                 })
     return embedding_logs
 
+# ---------- 선택된 해시태그 벡터 수집 ----------
 def collect_selected_embeddings(db, HashtagModel, tags, seen_embeddings: set):
     selected = []
     for tag in tags:
@@ -138,6 +141,7 @@ def collect_selected_embeddings(db, HashtagModel, tags, seen_embeddings: set):
             selected.append(np.array(embedding, dtype=np.float32).reshape(1, -1))
     return selected
 
+# ---------- 유사도 기반 상위 장소 ID 추출 ----------
 def get_top_place_ids(selected_embeddings, embedding_logs):
     top_ids = set()
     for query_vector in selected_embeddings:
@@ -146,6 +150,7 @@ def get_top_place_ids(selected_embeddings, embedding_logs):
             top_ids.add(res["place_id"])
     return top_ids
 
+# ---------- 최종 MoveInfo 응답 생성 ----------
 def build_filtered_move_response(db, PlaceModel, pk_field_name, place_ids):
     move_infos = []
     for pid in place_ids:
@@ -158,6 +163,7 @@ def build_filtered_move_response(db, PlaceModel, pk_field_name, place_ids):
             ))
     return move_infos
 
+# ---------- /move ----------
 @router.post("/move", response_model=MoveResponse)
 def get_move_candidates(input_data: MoveInput, db: Session = Depends(get_db)):
     viewport = input_data.viewport
