@@ -8,10 +8,11 @@ class PlaceNameOnly(BaseModel):
     name: str
 
 class PlaceEditInput(BaseModel):
-    places_by_day: Dict[str, List[PlaceNameOnly]]
+    user_id: str
+    places_by_day: Dict[int, List[PlaceNameOnly]]
 
 class PlaceEditOutput(BaseModel):
-    places_by_day: Dict[str, List[PlaceNameOnly]]
+    places_by_day: Dict[int, List[PlaceNameOnly]]
 
 # ------------------- /api/places/search -------------------
 class PlaceSearchResult(BaseModel):

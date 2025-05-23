@@ -39,7 +39,7 @@ class MoveResponse(BaseModel):
 
 class RouteInput(BaseModel):
     user_id: str
-    date: str
+    date: int
 
 class VisitInfo(BaseModel):
     order: int

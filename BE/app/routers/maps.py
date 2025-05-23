@@ -283,7 +283,12 @@ def build_schedule_input(user_id: str, target_date: str, db: Session) -> dict:
         return {
             "places": [],
             "user": user_info.dict(),
-            "day_info": get_day_info(user_id, target_date)
+            "day_info": {
+                "is_first_day": target_date == 1,
+                "is_last_day": target_date == len(places_by_day),
+                "date": target_date,
+                "weekday": f"Day {target_date}"
+            }
         }
 
     place_objs: List[dict] = []
@@ -306,7 +311,8 @@ def build_schedule_input(user_id: str, target_date: str, db: Session) -> dict:
                     "category": mapped_category,
                     "open_time": db_place.open_time or "00:00",
                     "close_time": db_place.close_time or "23:59",
-                    "service_time": int(db_place.service_time or 0),
+                    "service_time": int(place["service_time"] if isinstance(place, dict) and "service_time" in place 
+                                        else db_place.service_time or 0),
                     "tags": getattr(db_place, "tags", []) or [],
                     "closed_days": getattr(db_place, "closed_days", []) or [],
                     "break_time": getattr(db_place, "break_time", []) or [],
@@ -317,7 +323,12 @@ def build_schedule_input(user_id: str, target_date: str, db: Session) -> dict:
     return {
         "places": place_objs,
         "user": user_info.dict(),
-        "day_info": get_day_info(user_id, target_date)
+        "day_info": {
+            "is_first_day": target_date == 1,
+            "is_last_day": target_date == len(places_by_day),
+            "date": target_date,
+            "weekday": f"Day {target_date}"
+        }
     }
 
 # ---------- /route ----------

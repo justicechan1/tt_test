@@ -93,22 +93,19 @@ def get_place_detail(name: str = Query(..., min_length=1), db: Session = Depends
     raise HTTPException(status_code=404, detail="해당 장소는 데이터베이스에 존재하지 않습니다.")
 
 # 날짜 변환(Day1~DayN)
-def convert_to_day_keys(places_by_day: Dict[str, List], start_date_str: str) -> Dict[str, List[PlaceNameOnly]]:
-    start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+def convert_to_day_indices(places_by_day: Dict[int, List], start_date_str: str) -> Dict[int, List[PlaceNameOnly]]:
     result = {}
-    for date_str in sorted(places_by_day.keys()):
-        current_date = datetime.strptime(date_str, "%Y-%m-%d")
-        day_index = (current_date - start_date).days
-        day_key = f"Day {day_index}"
-        result[day_key] = [
+    for day_index in sorted(places_by_day.keys()):
+        result[day_index] = [
             PlaceNameOnly(name=p["name"] if isinstance(p, dict) else p.name)
-            for p in places_by_day[date_str]
+            for p in places_by_day[day_index]
         ]
     return result
 
 # ---------- /add ----------
 @router.post("/add", response_model=PlaceEditOutput)
-def add_place(input_data: PlaceEditInput, user_id: str = Query(...), db: Session = Depends(get_db)):
+def add_place(input_data: PlaceEditInput, db: Session = Depends(get_db)):
+    user_id = input_data.user_id
     if user_id not in user_schedules:
         raise HTTPException(status_code=404, detail="해당 사용자의 일정이 존재하지 않습니다.")
 
@@ -148,12 +145,13 @@ def add_place(input_data: PlaceEditInput, user_id: str = Query(...), db: Session
             user_data["places_by_day"][date].append({"name": place_name})
 
     return PlaceEditOutput(
-        places_by_day=convert_to_day_keys(user_data["places_by_day"], user_data["date"].start_date)
+        places_by_day=convert_to_day_indices(user_data["places_by_day"], user_data["date"].start_date)
     )
 
 # ---------- /remove ----------
 @router.post("/remove", response_model=PlaceEditOutput)
-def remove_place(input_data: PlaceEditInput, user_id: str = Query(...)):
+def remove_place(input_data: PlaceEditInput):
+    user_id = input_data.user_id
     if user_id not in user_schedules:
         raise HTTPException(status_code=404, detail="해당 사용자의 일정이 존재하지 않습니다.")
 
@@ -184,5 +182,5 @@ def remove_place(input_data: PlaceEditInput, user_id: str = Query(...)):
             ]
 
     return PlaceEditOutput(
-        places_by_day=convert_to_day_keys(user_data["places_by_day"], user_data["date"].start_date)
+        places_by_day=convert_to_day_indices(user_data["places_by_day"], user_data["date"].start_date)
     )

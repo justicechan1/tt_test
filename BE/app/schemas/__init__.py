@@ -8,5 +8,8 @@ from .schedule import (
     ScheduleShowOutput,
     PlaceSimpleInput,
     PlaceDetailOutput,
-    PlaceInfoOutputByDay
+    PlaceInfoOutputByDay,
+    EditServiceTimeInput, 
+    EditServiceTimeOutput,
+    PlaceWithTime
 )

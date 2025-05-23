@@ -33,7 +33,7 @@ class ScheduleInitInput(BaseModel):
     date: DateInfo
     start_end: StartEndInfo
     user: UserPreference
-    places_by_day: Dict[str, List[PlaceSimpleInput]]
+    places_by_day: Dict[int, List[PlaceSimpleInput]]
 
 
 # ------------------- /init 응답 -------------------
@@ -55,7 +55,7 @@ class PlaceDetailOutput(BaseModel):
 class ScheduleInitOutput(BaseModel):
     date: DateInfo
     start_end: StartEndInfo
-    places_by_day: Dict[str, List[PlaceDetailOutput]]
+    places_by_day: Dict[int, List[PlaceDetailOutput]]
 
 
 # ------------------- /init_show 요청 -------------------
@@ -76,9 +76,24 @@ class PlaceInfoOutputByDay(BaseModel):
     business_hours: Optional[str] = ""
     open_time: Optional[str] = ""
     close_time: Optional[str] = ""
+    service_time: Optional[int] = 0
     image_urls: Optional[List[str]] = []
 
 class ScheduleShowOutput(BaseModel):
     date: DateInfo
     start_end: StartEndInfo
-    places_by_day: Dict[str, List[PlaceInfoOutputByDay]]
+    places_by_day: Dict[int, List[PlaceInfoOutputByDay]]
+
+# ------------------- /edit_service_time -------------------
+class EditServiceTimeInput(BaseModel):
+    user_id: str
+    day: int
+    place_name: str
+    new_service_time: int
+
+class PlaceWithTime(BaseModel):
+    name: str
+    service_time: Optional[int] = 0
+
+class EditServiceTimeOutput(BaseModel):
+    places_by_day: Dict[int, List[PlaceWithTime]]

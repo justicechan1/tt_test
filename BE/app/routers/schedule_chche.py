@@ -1,5 +1,5 @@
 #router/schedule_chche.py
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
@@ -12,8 +12,9 @@ from app.models.jeju_transport import JejuTransport
 from app.cache import user_schedules
 from app.schemas import (
     ScheduleInitInput, ScheduleInitOutput,
-    ScheduleShowInput, ScheduleShowOutput,
-    PlaceSimpleInput, PlaceDetailOutput, PlaceInfoOutputByDay
+    EditServiceTimeInput, ScheduleShowOutput,
+    EditServiceTimeOutput, PlaceDetailOutput, PlaceInfoOutputByDay,
+    PlaceWithTime
 )
 
 router = APIRouter(prefix="/api/users/schedules", tags=["Schedule"])
@@ -47,8 +48,9 @@ def init_schedule(input_data: ScheduleInitInput, db: Session = Depends(get_db)):
     day_count = (end_dt - start_dt).days + 1
 
     for i in range(day_count):
+        day_index = i + 1
         date = (start_dt + timedelta(days=i)).strftime("%Y-%m-%d")
-        places = input_data.places_by_day.get(date, [])
+        places = input_data.places_by_day.get(day_index, [])
         enriched_places = []
 
         # 1. 도착지 추가 (첫날 맨 앞)
@@ -122,7 +124,7 @@ def init_schedule(input_data: ScheduleInitInput, db: Session = Depends(get_db)):
                     ))
                     break
 
-        enriched_places_by_day[date] = enriched_places
+        enriched_places_by_day[day_index] = enriched_places
 
     user_schedules[user_id]["places_by_day"] = enriched_places_by_day
 
@@ -149,14 +151,11 @@ def show_schedule(user_id: str = Query(..., min_length=1), db: Session = Depends
     start_date = datetime.strptime(date_info.start_date, "%Y-%m-%d")
 
     # 날짜 정렬
-    for date_str in sorted(stored_places_by_day.keys()):
-        current_date = datetime.strptime(date_str, "%Y-%m-%d")
-        day_index = (current_date - start_date).days + 1
-        day_key = f"Day {day_index}"  
+    for day_index in sorted(stored_places_by_day.keys()):
 
         day_places = []
 
-        for place in stored_places_by_day[date_str]:
+        for place in stored_places_by_day[day_index]:
             place_name = place["name"] if isinstance(place, dict) else place.name
 
             for category, PlaceModel in PLACE_MODELS.items():
@@ -178,15 +177,50 @@ def show_schedule(user_id: str = Query(..., min_length=1), db: Session = Depends
                             business_hours=None,
                             open_time=db_place.open_time or "",
                             close_time=db_place.close_time or "",
+                            service_time=int(place["service_time"] if isinstance(place, dict) and "service_time" in place 
+                                             else db_place.service_time or 0),
                             image_urls=image_urls
                         )
                     )
                     break
 
-        result_places_by_day[day_key] = day_places
+        result_places_by_day[day_index] = day_places
 
     return ScheduleShowOutput(
         date=date_info,
         start_end=start_end_info,
         places_by_day=result_places_by_day  
     )
+
+@router.post("/service_time", response_model=EditServiceTimeOutput)
+def edit_service_time(input: EditServiceTimeInput):
+    user_id = input.user_id
+    day = input.day
+    place_name = input.place_name.strip()
+    new_service_time = input.new_service_time
+
+    if user_id not in user_schedules:
+        raise HTTPException(status_code=404, detail="해당 사용자의 일정이 없습니다.")
+
+    day_places = user_schedules[user_id]["places_by_day"].get(day)
+    if not day_places:
+        raise HTTPException(status_code=404, detail=f"{day}일차 일정이 존재하지 않습니다.")
+
+    updated_list = []
+
+    for i, place in enumerate(day_places):
+        name = place["name"] if isinstance(place, dict) else place.name
+        if name == place_name:
+            if not isinstance(place, dict):
+                place = place.__dict__
+                day_places[i] = place  # 객체 → dict 교체
+
+            place["service_time"] = new_service_time
+
+        updated_list.append(
+            PlaceWithTime(name=place["name"] if isinstance(place, dict) else place.name,
+                          service_time=place.get("service_time", 0) if isinstance(place, dict) else getattr(place, "service_time", 0))
+        )
+
+    return EditServiceTimeOutput(places_by_day={day: updated_list})
+
